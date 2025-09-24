@@ -65,7 +65,7 @@ A comprehensive Django backend with GraphQL API for the Pursuit mobile applicati
 1. **Clone the repository**
 
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/faithkatherine/pursuit-backend.git
    cd pursuit-backend
    ```
 
