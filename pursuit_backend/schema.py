@@ -1,6 +1,6 @@
 import graphene
 from graphene_django import DjangoObjectType
-from apps.accounts.schema import AccountsMutations, AccountsQueries
+from users.schema import AccountsMutations, AccountsQueries
 from apps.buckets.schema import BucketsMutations, BucketsQueries
 from apps.recommendations.schema import RecommendationsQueries
 from apps.insights.schema import InsightsQueries

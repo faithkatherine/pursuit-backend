@@ -12,10 +12,14 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 
 import os
 from pathlib import Path
-from decouple import config
+from decouple import Config, RepositoryEnv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Explicitly load .env file from BASE_DIR
+DOTENV_FILE = BASE_DIR / '.env'
+config = Config(RepositoryEnv(DOTENV_FILE))
 
 
 # Quick-start development settings - unsuitable for production
@@ -50,7 +54,7 @@ THIRD_PARTY_APPS = [
 ]
 
 LOCAL_APPS = [
-    'apps.accounts',
+    'users',
     'apps.core',
     'apps.buckets',
     'apps.recommendations',
@@ -95,33 +99,16 @@ WSGI_APPLICATION = 'pursuit_backend.wsgi.application'
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
 # Database Configuration
-import os
-from pathlib import Path
-
-# Use SQLite for development
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": config("DB_NAME", default="pursuit_db"),
+        "USER": config("DB_USER", default="pursuit_user"),
+        "PASSWORD": config("DB_PASSWORD", default="pursuit_password"),
+        "HOST": config("DB_HOST", default="localhost"),
+        "PORT": config("DB_PORT", default="5432"),
     }
 }
-
-# Uncomment below for PostgreSQL in production
-# if config("DATABASE_URL", default=None):
-#     DATABASES = {
-#         "default": dj_database_url.parse(config("DATABASE_URL"))
-#     }
-# else:
-#     DATABASES = {
-#         "default": {
-#             "ENGINE": "django.db.backends.postgresql",
-#             "NAME": config("DB_NAME", default="pursuit_db"),
-#             "USER": config("DB_USER", default="pursuit_user"),
-#             "PASSWORD": config("DB_PASSWORD", default="pursuit_password"),
-#             "HOST": config("DB_HOST", default="localhost"),
-#             "PORT": config("DB_PORT", default="5432"),
-#         }
-#     }
 
 
 # Password validation
@@ -170,25 +157,25 @@ MEDIA_ROOT = BASE_DIR / 'mediafiles'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Custom User Model
-AUTH_USER_MODEL = 'accounts.User'
+AUTH_USER_MODEL = 'users.User'
 
-# REST Framework Configuration
-REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.SessionAuthentication',
-        'apps.accounts.authentication.JWTAuthentication',
-    ],
-    'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
-    ],
-    'DEFAULT_FILTER_BACKENDS': [
-        'django_filters.rest_framework.DjangoFilterBackend',
-        'rest_framework.filters.SearchFilter',
-        'rest_framework.filters.OrderingFilter',
-    ],
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 20,
-}
+# REST Framework Configuration - DISABLED (Using GraphQL only)
+# REST_FRAMEWORK = {
+#     'DEFAULT_AUTHENTICATION_CLASSES': [
+#         'rest_framework.authentication.SessionAuthentication',
+#         'users.authentication.JWTAuthentication',
+#     ],
+#     'DEFAULT_PERMISSION_CLASSES': [
+#         'rest_framework.permissions.IsAuthenticated',
+#     ],
+#     'DEFAULT_FILTER_BACKENDS': [
+#         'django_filters.rest_framework.DjangoFilterBackend',
+#         'rest_framework.filters.SearchFilter',
+#         'rest_framework.filters.OrderingFilter',
+#     ],
+#     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+#     'PAGE_SIZE': 20,
+# }
 
 # GraphQL Configuration
 GRAPHENE = {
