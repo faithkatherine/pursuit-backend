@@ -1,38 +1,35 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.translation import gettext_lazy as _
-from .models import User, UserProfile, LoginAttempt, RefreshToken
+from .models import User, UserProfile, Interest, LoginAttempt, RefreshToken, UserSession
 
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
     """Custom user admin"""
 
-    list_display = ['email', 'first_name', 'last_name', 'is_active', 'is_staff', 'created_at', 'last_login']
-    list_filter = ['is_active', 'is_staff', 'is_superuser', 'has_completed_onboarding', 'is_email_verified']
+    list_display = ['email', 'first_name', 'last_name', 'is_active', 'is_staff', 'date_joined', 'last_login']
+    list_filter = ['is_active', 'is_staff', 'is_superuser', 'auth_provider', 'is_email_verified']
     search_fields = ['email', 'first_name', 'last_name', 'username']
-    ordering = ['-created_at']
-    readonly_fields = ['id', 'created_at', 'updated_at', 'last_login_at']
+    ordering = ['-date_joined']
+    readonly_fields = ['id', 'date_joined', 'updated_at', 'last_login_at']
 
     fieldsets = (
         (None, {'fields': ('username', 'email', 'password')}),
         (_('Personal info'), {
-            'fields': ('first_name', 'last_name', 'avatar')
+            'fields': ('first_name', 'last_name', 'profile_picture')
         }),
-        (_('Profile'), {
-            'fields': ('has_completed_onboarding', 'interests')
-        }),
-        (_('OAuth'), {
-            'fields': ('google_id',)
+        (_('Authentication'), {
+            'fields': ('auth_provider', 'provider_id')
         }),
         (_('Security'), {
-            'fields': ('is_email_verified', 'email_verification_token', 'password_reset_token', 'password_reset_expires')
+            'fields': ('is_email_verified', 'email_verification_token_hash', 'email_verification_sent_at', 'password_reset_token_hash', 'password_reset_expires')
         }),
         (_('Permissions'), {
             'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')
         }),
         (_('Important dates'), {
-            'fields': ('last_login', 'date_joined', 'created_at', 'updated_at', 'last_login_at'),
+            'fields': ('last_login', 'date_joined', 'updated_at', 'last_login_at'),
             'classes': ('collapse',)
         }),
     )
@@ -49,20 +46,34 @@ class UserAdmin(BaseUserAdmin):
 class UserProfileAdmin(admin.ModelAdmin):
     """User profile admin"""
 
-    list_display = ['user', 'location', 'is_profile_public', 'created_at']
-    list_filter = ['is_profile_public', 'allow_email_notifications', 'allow_push_notifications']
+    list_display = ['user', 'location', 'is_profile_public', 'payment_plan', 'is_onboarding_completed', 'created_at']
+    list_filter = ['is_profile_public', 'allow_email_notifications', 'allow_push_notifications', 'payment_plan', 'is_onboarding_completed']
     search_fields = ['user__email', 'user__first_name', 'user__last_name', 'location']
     readonly_fields = ['created_at', 'updated_at']
 
     fieldsets = (
         (_('Profile'), {
-            'fields': ('user', 'bio', 'location', 'birth_date', 'phone_number')
+            'fields': ('user', 'bio', 'birth_date', 'phone_number')
+        }),
+        (_('Location'), {
+            'fields': ('location', 'home_latitude', 'home_longitude', 'search_radius_km', 'timezone')
+        }),
+        (_('Onboarding'), {
+            'fields': ('is_onboarding_completed', 'interests')
         }),
         (_('Privacy'), {
             'fields': ('is_profile_public', 'allow_email_notifications', 'allow_push_notifications')
         }),
-        (_('Social Links'), {
-            'fields': ('website', 'twitter_username', 'instagram_username'),
+        (_('Calendar'), {
+            'fields': ('calendar_integrated', 'calendar_provider', 'calendar_sync_token', 'calendar_last_synced_at'),
+            'classes': ('collapse',)
+        }),
+        (_('Subscription'), {
+            'fields': ('payment_plan', 'subscription_expires_at', 'last_billing_date'),
+            'classes': ('collapse',)
+        }),
+        (_('Usage'), {
+            'fields': ('last_active_at', 'login_count', 'theme'),
             'classes': ('collapse',)
         }),
         (_('Timestamps'), {
@@ -92,10 +103,37 @@ class LoginAttemptAdmin(admin.ModelAdmin):
 class RefreshTokenAdmin(admin.ModelAdmin):
     """Refresh token admin"""
 
-    list_display = ['user', 'is_revoked', 'expires_at', 'created_at']
+    list_display = ['user', 'session', 'is_revoked', 'expires_at', 'created_at']
     list_filter = ['is_revoked', 'expires_at', 'created_at']
     search_fields = ['user__email']
-    readonly_fields = ['id', 'user', 'token', 'expires_at', 'created_at']
+    readonly_fields = ['id', 'user', 'session', 'token', 'expires_at', 'created_at']
 
     def has_add_permission(self, request):
+        return False
+
+
+@admin.register(Interest)
+class InterestAdmin(admin.ModelAdmin):
+    """Interest admin for managing available interests"""
+
+    list_display = ['name', 'description', 'icon', 'user_count']
+    search_fields = ['name', 'description']
+    ordering = ['name']
+
+    def user_count(self, obj):
+        return obj.users.count()
+    user_count.short_description = 'Users'
+
+
+@admin.register(UserSession)
+class UserSessionAdmin(admin.ModelAdmin):
+    """User session admin for managing device sessions"""
+
+    list_display = ['user', 'device_info', 'ip_address', 'is_active', 'created_at', 'last_active_at']
+    list_filter = ['is_active', 'created_at']
+    search_fields = ['user__email', 'device_info', 'ip_address']
+    readonly_fields = ['id', 'user', 'session_token', 'device_info', 'ip_address', 'user_agent', 'created_at', 'last_active_at']
+
+    def has_add_permission(self, request):
+        return False
         return False
