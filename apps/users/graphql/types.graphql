@@ -1,0 +1,206 @@
+# =============================================================================
+# User Types - GraphQL Type Definitions
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Core Types
+# -----------------------------------------------------------------------------
+
+"""
+Interest category for user preferences
+"""
+type Interest {
+  id: ID!
+  name: String!
+  description: String
+  icon: String
+}
+
+"""
+User profile containing preferences and settings
+"""
+type UserProfile {
+  # Bio & Location
+  bio: String
+  location: String
+  homeLatitude: Float
+  homeLongitude: Float
+  coordinates: [Float]
+  hasLocation: Boolean!
+  searchRadiusKm: Int
+  timezone: String
+
+  # Personal Info
+  birthDate: Date
+  phoneNumber: String
+
+  # Preferences
+  interests: [Interest!]
+  isOnboardingCompleted: Boolean!
+  isProfilePublic: Boolean!
+
+  # Notifications
+  allowEmailNotifications: Boolean!
+  allowPushNotifications: Boolean!
+
+  # Calendar Integration
+  calendarIntegrated: Boolean!
+  calendarProvider: String
+  calendarLastSyncedAt: DateTime
+
+  # Subscription
+  paymentPlan: String!
+  subscriptionExpiresAt: DateTime
+  lastBillingDate: DateTime
+  isPremium: Boolean!
+
+  # Activity
+  lastActiveAt: DateTime
+  loginCount: Int!
+
+  # Appearance
+  theme: String!
+
+  # Timestamps
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+"""
+User session representing a logged-in device
+"""
+type UserSession {
+  id: ID!
+  sessionToken: String!
+  deviceInfo: String
+  ipAddress: String
+  userAgent: String
+  isActive: Boolean!
+  createdAt: DateTime!
+  lastActiveAt: DateTime!
+}
+
+"""
+User account
+"""
+type User {
+  id: ID!
+  email: String!
+  username: String!
+  firstName: String!
+  lastName: String
+
+  # Computed fields
+  fullName: String!
+  name: String!
+
+  # Profile
+  profilePicture: String
+  profile: UserProfile
+
+  # Status
+  isActive: Boolean!
+  isEmailVerified: Boolean!
+  authProvider: String!
+
+  # Sessions
+  activeSessions: [UserSession!]
+  sessionCount: Int!
+
+  # Timestamps
+  dateJoined: DateTime!
+  updatedAt: DateTime!
+  lastLoginAt: DateTime
+}
+
+# -----------------------------------------------------------------------------
+# Auth Response Types
+# -----------------------------------------------------------------------------
+
+"""
+Authentication payload returned after successful auth
+"""
+type AuthPayload {
+  accessToken: String!
+  sessionToken: String!
+  refreshToken: String!
+  expiresIn: Int!
+  user: User!
+}
+
+"""
+Standard mutation response with auth
+"""
+type AuthResponse {
+  ok: Boolean!
+  errors: [String!]
+  authPayload: AuthPayload
+}
+
+"""
+Sign up response
+"""
+type SignUpResponse {
+  ok: Boolean!
+  errors: [String!]
+  authPayload: AuthPayload
+  userExists: Boolean
+  requiresVerification: Boolean
+}
+
+"""
+Sign in response
+"""
+type SignInResponse {
+  ok: Boolean!
+  errors: [String!]
+  authPayload: AuthPayload
+}
+
+"""
+Google sign in response
+"""
+type GoogleSignInResponse {
+  ok: Boolean!
+  errors: [String!]
+  authPayload: AuthPayload
+  isNewUser: Boolean
+}
+
+"""
+Sign out response
+"""
+type SignOutResponse {
+  ok: Boolean!
+  errors: [String!]
+}
+
+"""
+Token refresh response
+"""
+type RefreshTokenResponse {
+  ok: Boolean!
+  errors: [String!]
+  accessToken: String
+  refreshToken: String
+  expiresIn: Int
+}
+
+# -----------------------------------------------------------------------------
+# Scalar Types
+# -----------------------------------------------------------------------------
+
+"""
+Date scalar (YYYY-MM-DD)
+"""
+scalar Date
+
+"""
+DateTime scalar (ISO 8601)
+"""
+scalar DateTime
+
+"""
+UUID scalar
+"""
+scalar UUID

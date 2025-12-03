@@ -1,25 +1,20 @@
 import graphene
 from graphene_django import DjangoObjectType
-from users.schema import AccountsMutations, AccountsQueries
-from apps.buckets.schema import BucketsMutations, BucketsQueries
-from apps.recommendations.schema import RecommendationsQueries
-from apps.insights.schema import InsightsQueries
+
+from apps.users.schema import UsersMutations
 
 
-class Query(
-    AccountsQueries,
-    BucketsQueries,
-    RecommendationsQueries,
-    InsightsQueries,
-    graphene.ObjectType
-):
+class Query(graphene.ObjectType):
     """Root Query combining all app queries"""
-    pass
+    # GraphQL requires at least one query field
+    health = graphene.String(description="API health check")
+
+    def resolve_health(self, info):
+        return "ok"
 
 
-class Mutation(
-    AccountsMutations,
-    BucketsMutations,
+class Mutation(  
+    UsersMutations,
     graphene.ObjectType
 ):
     """Root Mutation combining all app mutations"""

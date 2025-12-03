@@ -57,7 +57,7 @@ class User(AbstractUser):
 
     # Personal information
     first_name = models.CharField(_('first name'), max_length=150, blank=False)
-    last_name = models.CharField(_('last name'), max_length=150, blank=True)
+    last_name = models.CharField(_('last name'), max_length=150, blank=True, null=True)
     profile_picture = models.ImageField(upload_to='profile_pictures/', blank=True, null=True)
 
     # Status fields

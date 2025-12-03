@@ -33,6 +33,11 @@ DEBUG = config('DEBUG', default=True, cast=bool)
 
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1,0.0.0.0', cast=lambda v: [s.strip() for s in v.split(',')])
 
+# Google OAuth
+GOOGLE_CLIENT_ID = config('GOOGLE_CLIENT_ID', default='')
+GOOGLE_CLIENT_SECRET = config('GOOGLE_CLIENT_SECRET', default='')
+GOOGLE_ANDROID_CLIENT_ID = config('GOOGLE_ANDROID_CLIENT_ID')  # Android
+GOOGLE_IOS_CLIENT_ID = config('GOOGLE_IOS_CLIENT_ID')  # iOS
 
 # Application definition
 
@@ -54,7 +59,7 @@ THIRD_PARTY_APPS = [
 ]
 
 LOCAL_APPS = [
-    'users',
+    'apps.users',
     'apps.core',
     'apps.buckets',
     'apps.recommendations',
@@ -159,24 +164,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Custom User Model
 AUTH_USER_MODEL = 'users.User'
 
-# REST Framework Configuration - DISABLED (Using GraphQL only)
-# REST_FRAMEWORK = {
-#     'DEFAULT_AUTHENTICATION_CLASSES': [
-#         'rest_framework.authentication.SessionAuthentication',
-#         'users.authentication.JWTAuthentication',
-#     ],
-#     'DEFAULT_PERMISSION_CLASSES': [
-#         'rest_framework.permissions.IsAuthenticated',
-#     ],
-#     'DEFAULT_FILTER_BACKENDS': [
-#         'django_filters.rest_framework.DjangoFilterBackend',
-#         'rest_framework.filters.SearchFilter',
-#         'rest_framework.filters.OrderingFilter',
-#     ],
-#     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-#     'PAGE_SIZE': 20,
-# }
-
 # GraphQL Configuration
 GRAPHENE = {
     'SCHEMA': 'pursuit_backend.schema.schema',
@@ -186,14 +173,22 @@ GRAPHENE = {
 }
 
 # JWT Configuration
-JWT_SECRET_KEY = config('JWT_SECRET_KEY', default=SECRET_KEY)
-JWT_ALGORITHM = 'HS256'
-JWT_EXPIRATION_DELTA = 60 * 60 * 24 * 7  # 7 days in seconds
-JWT_REFRESH_EXPIRATION_DELTA = 60 * 60 * 24 * 30  # 30 days in seconds
+JWT_SECRET_KEY = config('JWT_SECRET_KEY', default=None)
+if not JWT_SECRET_KEY:
+    if DEBUG:
+        # Use SECRET_KEY in development only
+        JWT_SECRET_KEY = SECRET_KEY
+    else:
+        raise ValueError("JWT_SECRET_KEY must be set in production! Generate with: python -c \"import secrets; print(secrets.token_hex(32))\"")
 
-# Google OAuth Configuration
-GOOGLE_OAUTH2_CLIENT_ID = config('GOOGLE_OAUTH2_CLIENT_ID', default='')
-GOOGLE_OAUTH2_CLIENT_SECRET = config('GOOGLE_OAUTH2_CLIENT_SECRET', default='')
+# Validate JWT secret is strong enough (at least 32 bytes / 256 bits)
+if len(JWT_SECRET_KEY) < 32:
+    import warnings
+    warnings.warn("JWT_SECRET_KEY should be at least 32 characters (256 bits) for security")
+
+JWT_ALGORITHM = 'HS256'
+JWT_EXPIRATION_DELTA = 60 * 60  # 1 hour (was 7 days - too long for access token!)
+JWT_REFRESH_EXPIRATION_DELTA = 60 * 60 * 24 * 30  # 30 days in seconds
 
 # CORS Configuration
 CORS_ALLOWED_ORIGINS = [

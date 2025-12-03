@@ -2,7 +2,7 @@ import graphene
 from graphene_django import DjangoObjectType
 from apps.core.models import Category
 from .models import BucketList, BucketItem
-from .serializers import BucketItemSerializer, CategorySerializer
+
 
 
 class CategoryType(DjangoObjectType):

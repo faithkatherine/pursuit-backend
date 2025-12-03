@@ -1,7 +1,8 @@
 import jwt
-from datetime import datetime, timedelta
+from datetime import timedelta
 from django.conf import settings
 from django.contrib.auth import authenticate
+from django.utils import timezone
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
 from .models import User, RefreshToken
@@ -42,34 +43,32 @@ class JWTService:
     @staticmethod
     def generate_access_token(user):
         """Generate access token for user"""
+        now = timezone.now()
         payload = {
             'user_id': str(user.id),
             'email': user.email,
-            'exp': datetime.utcnow() + timedelta(seconds=settings.JWT_EXPIRATION_DELTA),
-            'iat': datetime.utcnow(),
+            'exp': now + timedelta(seconds=settings.JWT_EXPIRATION_DELTA),
+            'iat': now,
             'type': 'access'
         }
         return jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
     @staticmethod
-    def generate_refresh_token(user):
-        """Generate and store refresh token for user"""
+    def generate_refresh_token(user, session=None):
+        """Generate refresh token for user (does NOT store in DB - caller handles that)"""
+        now = timezone.now()
         payload = {
             'user_id': str(user.id),
-            'exp': datetime.utcnow() + timedelta(seconds=settings.JWT_REFRESH_EXPIRATION_DELTA),
-            'iat': datetime.utcnow(),
+            'session_id': str(session.id) if session else None,
+            'exp': now + timedelta(seconds=settings.JWT_REFRESH_EXPIRATION_DELTA),
+            'iat': now,
             'type': 'refresh'
         }
 
         token = jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
-
-        # Store refresh token in database
-        refresh_token = RefreshToken.objects.create(
-            user=user,
-            token=token,
-            expires_at=datetime.utcnow() + timedelta(seconds=settings.JWT_REFRESH_EXPIRATION_DELTA)
-        )
-
+        
+        # NOTE: RefreshToken DB record is created by the caller (schema.py mutations)
+        # This avoids duplicate creation and allows caller to link session
         return token
 
     @staticmethod
@@ -98,7 +97,7 @@ class JWTService:
             db_token = RefreshToken.objects.get(
                 token=refresh_token,
                 is_revoked=False,
-                expires_at__gt=datetime.utcnow()
+                expires_at__gt=timezone.now()
             )
 
             user = db_token.user
