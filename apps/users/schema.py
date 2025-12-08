@@ -1,10 +1,7 @@
 import graphene
 import uuid
-import hashlib
-import secrets
 from datetime import timedelta
 from apps.users.models import User as UserModel, UserProfile as UserProfileModel, UserSession as UserSessionModel, RefreshToken
-from django.db.models import Q
 from apps.users.authentication import JWTService
 from apps.users.types import AuthPayload
 from django.utils import timezone
@@ -169,26 +166,41 @@ class SignIn(graphene.Mutation):
 
 def verify_google_token(token):
     """Verify Google ID token and return user info"""
-    try:
-        # Verify the token with Google
-        idinfo = id_token.verify_oauth2_token(
-            token,
-            google_requests.Request(),
-            settings.GOOGLE_CLIENT_ID
-        )
-        
-        # Token is valid, return user info
-        return {
-            'google_id': idinfo['sub'],
-            'email': idinfo['email'],
-            'email_verified': idinfo.get('email_verified', False),
-            'first_name': idinfo.get('given_name', ''),
-            'last_name': idinfo.get('family_name', ''),
-            'picture': idinfo.get('picture', ''),
-        }
-    except ValueError:
-        # Invalid token
-        return None
+    # List of all valid client IDs (Web, iOS, Android)
+    valid_client_ids = [
+        settings.GOOGLE_CLIENT_ID,           # Web
+        settings.GOOGLE_IOS_CLIENT_ID,       # iOS
+        settings.GOOGLE_ANDROID_CLIENT_ID,   # Android
+    ]
+    
+    # Try to verify with each client ID
+    for client_id in valid_client_ids:
+        if not client_id:
+            continue
+            
+        try:
+            # Verify the token with Google
+            idinfo = id_token.verify_oauth2_token(
+                token,
+                google_requests.Request(),
+                client_id
+            )
+            
+            # Token is valid, return user info
+            return {
+                'google_id': idinfo['sub'],
+                'email': idinfo['email'],
+                'email_verified': idinfo.get('email_verified', False),
+                'first_name': idinfo.get('given_name', ''),
+                'last_name': idinfo.get('family_name', ''),
+                'picture': idinfo.get('picture', ''),
+            }
+        except ValueError:
+            # Try next client ID
+            continue
+    
+    # Token is invalid for all client IDs
+    return None
 
 
 class GoogleSignIn(graphene.Mutation):

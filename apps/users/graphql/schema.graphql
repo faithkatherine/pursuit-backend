@@ -6,17 +6,31 @@
 # =============================================================================
 
 # -----------------------------------------------------------------------------
-# Scalars
+# Scalar Types
 # -----------------------------------------------------------------------------
 
+"""
+Date scalar (YYYY-MM-DD)
+"""
 scalar Date
+
+"""
+DateTime scalar (ISO 8601)
+"""
 scalar DateTime
+
+"""
+UUID scalar
+"""
 scalar UUID
 
 # -----------------------------------------------------------------------------
-# Types
+# Core Types
 # -----------------------------------------------------------------------------
 
+"""
+Interest category for user preferences
+"""
 type Interest {
   id: ID!
   name: String!
@@ -24,7 +38,11 @@ type Interest {
   icon: String
 }
 
+"""
+User profile containing preferences and settings
+"""
 type UserProfile {
+  # Bio & Location
   bio: String
   location: String
   homeLatitude: Float
@@ -33,27 +51,46 @@ type UserProfile {
   hasLocation: Boolean!
   searchRadiusKm: Int
   timezone: String
+
+  # Personal Info
   birthDate: Date
   phoneNumber: String
+
+  # Preferences
   interests: [Interest!]
   isOnboardingCompleted: Boolean!
   isProfilePublic: Boolean!
+
+  # Notifications
   allowEmailNotifications: Boolean!
   allowPushNotifications: Boolean!
+
+  # Calendar Integration
   calendarIntegrated: Boolean!
   calendarProvider: String
   calendarLastSyncedAt: DateTime
+
+  # Subscription
   paymentPlan: String!
   subscriptionExpiresAt: DateTime
   lastBillingDate: DateTime
   isPremium: Boolean!
+
+  # Activity
   lastActiveAt: DateTime
   loginCount: Int!
+
+  # Appearance
   theme: String!
+
+  # Timestamps
   createdAt: DateTime!
   updatedAt: DateTime!
 }
 
+"""
+User session representing a logged-in device
+"""
 type UserSession {
   id: ID!
   sessionToken: String!
@@ -65,26 +102,46 @@ type UserSession {
   lastActiveAt: DateTime!
 }
 
+"""
+User account
+"""
 type User {
   id: ID!
   email: String!
   username: String!
   firstName: String!
   lastName: String
+
+  # Computed fields
   fullName: String!
   name: String!
+
+  # Profile
   profilePicture: String
   profile: UserProfile
+
+  # Status
   isActive: Boolean!
   isEmailVerified: Boolean!
   authProvider: String!
+
+  # Sessions
   activeSessions: [UserSession!]
   sessionCount: Int!
+
+  # Timestamps
   dateJoined: DateTime!
   updatedAt: DateTime!
   lastLoginAt: DateTime
 }
 
+# -----------------------------------------------------------------------------
+# Auth Response Types
+# -----------------------------------------------------------------------------
+
+"""
+Authentication payload returned after successful auth
+"""
 type AuthPayload {
   accessToken: String!
   sessionToken: String!
@@ -120,38 +177,48 @@ type Query {
 }
 
 # -----------------------------------------------------------------------------
-# Mutation Types - Input/Output
+# Mutation Response Types
 # -----------------------------------------------------------------------------
 
+"""
+Sign up response
+"""
 type SignUpPayload {
   ok: Boolean!
-  errors: [String!]
   authPayload: AuthPayload
   userExists: Boolean
   requiresVerification: Boolean
 }
 
+"""
+Sign in response
+"""
 type SignInPayload {
   ok: Boolean!
-  errors: [String!]
   authPayload: AuthPayload
 }
 
+"""
+Google sign in response
+"""
 type GoogleSignInPayload {
   ok: Boolean!
-  errors: [String!]
   authPayload: AuthPayload
   isNewUser: Boolean
 }
 
+"""
+Sign out response
+"""
 type SignOutPayload {
   ok: Boolean!
-  errors: [String!]
 }
 
+"""
+Token refresh response
+"""
 type RefreshTokenPayload {
   ok: Boolean!
-  errors: [String!]
   accessToken: String
   refreshToken: String
   expiresIn: Int

@@ -1,7 +1,6 @@
 import jwt
 from datetime import timedelta
 from django.conf import settings
-from django.contrib.auth import authenticate
 from django.utils import timezone
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed

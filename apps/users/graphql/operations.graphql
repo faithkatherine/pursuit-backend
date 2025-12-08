@@ -13,7 +13,6 @@ Creates a new user account and returns authentication tokens
 mutation SignUp($email: String!, $password: String!, $firstName: String!, $lastName: String) {
   signUp(email: $email, password: $password, firstName: $firstName, lastName: $lastName) {
     ok
-    errors
     userExists
     requiresVerification
     authPayload {
@@ -44,7 +43,6 @@ Returns authentication tokens for existing user
 mutation SignIn($email: String!, $password: String!) {
   signIn(email: $email, password: $password) {
     ok
-    errors
     authPayload {
       accessToken
       sessionToken
@@ -75,7 +73,6 @@ Handles both new user registration and existing user login
 mutation GoogleSignIn($idToken: String!) {
   googleSignIn(idToken: $idToken) {
     ok
-    errors
     isNewUser
     authPayload {
       accessToken
@@ -105,7 +102,6 @@ Revokes the current session and refresh token
 mutation SignOut($refreshToken: String!) {
   signOut(refreshToken: $refreshToken) {
     ok
-    errors
   }
 }
 
@@ -117,7 +113,6 @@ Use for security purposes (password change, compromised account)
 mutation SignOutAll($refreshToken: String!) {
   signOutAll(refreshToken: $refreshToken) {
     ok
-    errors
   }
 }
 
@@ -129,7 +124,6 @@ Implements sliding expiration - extends refresh token validity
 mutation RefreshAccessToken($refreshToken: String!) {
   refreshAccessToken(refreshToken: $refreshToken) {
     ok
-    errors
     accessToken
     refreshToken
     expiresIn
