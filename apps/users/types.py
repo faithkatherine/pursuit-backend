@@ -3,7 +3,20 @@ from graphene_django import DjangoObjectType
 from apps.users.models import User as UserModel, UserProfile as UserProfileModel, Interest as InterestModel, UserSession as UserSessionModel
 
 
-class Interest(DjangoObjectType):
+# =============================================================================
+# GraphQL Types (Alphabetical Order)
+# =============================================================================
+
+class AuthPayloadType(graphene.ObjectType):
+    """Standard auth response"""
+    access_token = graphene.String(required=True)
+    session_token = graphene.String(required=True)
+    refresh_token = graphene.String(required=True)
+    expires_in = graphene.Int()  # seconds until access token expires
+    user = graphene.Field(lambda: UserType, required=True)
+
+
+class InterestType(DjangoObjectType):
     """Interest GraphQL type"""
 
     class Meta:
@@ -11,10 +24,10 @@ class Interest(DjangoObjectType):
         fields = ('id', 'name', 'description', 'icon')
 
 
-class UserProfile(DjangoObjectType):
+class UserProfileType(DjangoObjectType):
     """User profile GraphQL type"""
 
-    interests = graphene.List(Interest)
+    interests = graphene.List(InterestType)
     coordinates = graphene.List(graphene.Float)
     has_location = graphene.Boolean()
     is_premium = graphene.Boolean()
@@ -51,7 +64,7 @@ class UserProfile(DjangoObjectType):
         return self.is_premium
 
 
-class UserSession(DjangoObjectType):
+class UserSessionType(DjangoObjectType):
     """User session GraphQL type"""
 
     class Meta:
@@ -62,13 +75,13 @@ class UserSession(DjangoObjectType):
         )
 
 
-class User(DjangoObjectType):
+class UserType(DjangoObjectType):
     """User GraphQL type"""
 
-    profile = graphene.Field(UserProfile)
+    profile = graphene.Field(UserProfileType)
     full_name = graphene.String()
     name = graphene.String()
-    active_sessions = graphene.List(UserSession)
+    active_sessions = graphene.List(UserSessionType)
     session_count = graphene.Int()
 
     class Meta:
@@ -98,12 +111,3 @@ class User(DjangoObjectType):
     def resolve_session_count(self, info):
         """Return count of active sessions"""
         return self.device_sessions.filter(is_active=True).count()
-
-
-class AuthPayload(graphene.ObjectType):
-    """Standard auth response"""
-    access_token = graphene.String(required=True)
-    session_token = graphene.String(required=True)
-    refresh_token = graphene.String(required=True)
-    expires_in = graphene.Int()  # seconds until access token expires
-    user = graphene.Field(User, required=True)

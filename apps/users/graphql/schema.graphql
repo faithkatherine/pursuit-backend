@@ -1,280 +1,346 @@
 # =============================================================================
-# Pursuit Backend - User Schema Definition Language (SDL)
-# =============================================================================
-# This file defines the complete GraphQL schema for the users module
-# Use this as documentation and for client code generation
+# User Queries & Mutations - Executable GraphQL Operations
 # =============================================================================
 
 # -----------------------------------------------------------------------------
-# Scalar Types
+# Mutations (Alphabetical Order)
 # -----------------------------------------------------------------------------
 
 """
-Date scalar (YYYY-MM-DD)
+Sign in with Google OAuth
+Handles both new user registration and existing user login
 """
-scalar Date
-
-"""
-DateTime scalar (ISO 8601)
-"""
-scalar DateTime
-
-"""
-UUID scalar
-"""
-scalar UUID
-
-# -----------------------------------------------------------------------------
-# Core Types
-# -----------------------------------------------------------------------------
-
-"""
-Interest category for user preferences
-"""
-type Interest {
-  id: ID!
-  name: String!
-  description: String
-  icon: String
+mutation GoogleSignIn($idToken: String!) {
+  googleSignIn(idToken: $idToken) {
+    ok
+    isNewUser
+    authPayload {
+      accessToken
+      sessionToken
+      refreshToken
+      expiresIn
+      user {
+        id
+        email
+        firstName
+        lastName
+        fullName
+        isEmailVerified
+        authProvider
+        profile {
+          isOnboardingCompleted
+        }
+      }
+    }
+  }
 }
 
 """
-User profile containing preferences and settings
+Refresh access token
+Use the refresh token to get a new access token
+Implements sliding expiration - extends refresh token validity
 """
-type UserProfile {
-  # Bio & Location
-  bio: String
-  location: String
-  homeLatitude: Float
-  homeLongitude: Float
-  coordinates: [Float]
-  hasLocation: Boolean!
-  searchRadiusKm: Int
-  timezone: String
-
-  # Personal Info
-  birthDate: Date
-  phoneNumber: String
-
-  # Preferences
-  interests: [Interest!]
-  isOnboardingCompleted: Boolean!
-  isProfilePublic: Boolean!
-
-  # Notifications
-  allowEmailNotifications: Boolean!
-  allowPushNotifications: Boolean!
-
-  # Calendar Integration
-  calendarIntegrated: Boolean!
-  calendarProvider: String
-  calendarLastSyncedAt: DateTime
-
-  # Subscription
-  paymentPlan: String!
-  subscriptionExpiresAt: DateTime
-  lastBillingDate: DateTime
-  isPremium: Boolean!
-
-  # Activity
-  lastActiveAt: DateTime
-  loginCount: Int!
-
-  # Appearance
-  theme: String!
-
-  # Timestamps
-  createdAt: DateTime!
-  updatedAt: DateTime!
+mutation RefreshAccessToken($refreshToken: String!) {
+  refreshAccessToken(refreshToken: $refreshToken) {
+    ok
+    accessToken
+    refreshToken
+    expiresIn
+  }
 }
 
 """
-User session representing a logged-in device
+Sign in with email and password
+Returns authentication tokens for existing user
 """
-type UserSession {
-  id: ID!
-  sessionToken: String!
-  deviceInfo: String
-  ipAddress: String
-  userAgent: String
-  isActive: Boolean!
-  createdAt: DateTime!
-  lastActiveAt: DateTime!
+mutation SignIn($email: String!, $password: String!) {
+  signIn(email: $email, password: $password) {
+    ok
+    authPayload {
+      accessToken
+      sessionToken
+      refreshToken
+      expiresIn
+      user {
+        id
+        email
+        firstName
+        lastName
+        fullName
+        isEmailVerified
+        authProvider
+        lastLoginAt
+        profile {
+          isOnboardingCompleted
+          isPremium
+        }
+      }
+    }
+  }
 }
 
 """
-User account
+Sign out from current device
+Revokes the current session and refresh token
 """
-type User {
-  id: ID!
-  email: String!
-  username: String!
-  firstName: String!
-  lastName: String
-
-  # Computed fields
-  fullName: String!
-  name: String!
-
-  # Profile
-  profilePicture: String
-  profile: UserProfile
-
-  # Status
-  isActive: Boolean!
-  isEmailVerified: Boolean!
-  authProvider: String!
-
-  # Sessions
-  activeSessions: [UserSession!]
-  sessionCount: Int!
-
-  # Timestamps
-  dateJoined: DateTime!
-  updatedAt: DateTime!
-  lastLoginAt: DateTime
+mutation SignOut($refreshToken: String!) {
+  signOut(refreshToken: $refreshToken) {
+    ok
+  }
 }
 
-# -----------------------------------------------------------------------------
-# Auth Response Types
-# -----------------------------------------------------------------------------
+"""
+Sign out from all devices
+Revokes all sessions and refresh tokens for the user
+Use for security purposes (password change, compromised account)
+"""
+mutation SignOutAll($refreshToken: String!) {
+  signOutAll(refreshToken: $refreshToken) {
+    ok
+  }
+}
 
 """
-Authentication payload returned after successful auth
+Sign up with email and password
+Creates a new user account and returns authentication tokens
 """
-type AuthPayload {
-  accessToken: String!
-  sessionToken: String!
-  refreshToken: String!
-  expiresIn: Int!
-  user: User!
+mutation SignUp($email: String!, $password: String!, $firstName: String!, $lastName: String) {
+  signUp(email: $email, password: $password, firstName: $firstName, lastName: $lastName) {
+    ok
+    userExists
+    requiresVerification
+    authPayload {
+      accessToken
+      sessionToken
+      refreshToken
+      expiresIn
+      user {
+        id
+        email
+        firstName
+        lastName
+        fullName
+        isEmailVerified
+        authProvider
+        profile {
+          isOnboardingCompleted
+        }
+      }
+    }
+  }
 }
 
 # -----------------------------------------------------------------------------
-# Query Type
-# -----------------------------------------------------------------------------
-
-type Query {
-  """
-  Get current authenticated user
-  """
-  me: User
-
-  """
-  Get user by ID
-  """
-  user(id: ID!): User
-
-  """
-  Get user profile by user ID
-  """
-  profile(userId: ID!): UserProfile
-
-  """
-  Get all available interests
-  """
-  interests: [Interest!]!
-}
-
-# -----------------------------------------------------------------------------
-# Mutation Response Types
+# Queries (Alphabetical Order)
 # -----------------------------------------------------------------------------
 
 """
-Sign up response
+Get user's active sessions
+For "Manage devices" feature
 """
-type SignUpPayload {
-  ok: Boolean!
-  authPayload: AuthPayload
-  userExists: Boolean
-  requiresVerification: Boolean
+query GetActiveSessions {
+  me {
+    activeSessions {
+      id
+      sessionToken
+      deviceInfo
+      ipAddress
+      isActive
+      createdAt
+      lastActiveAt
+    }
+    sessionCount
+  }
 }
 
 """
-Sign in response
+Get all available interests
+For onboarding and profile editing
 """
-type SignInPayload {
-  ok: Boolean!
-  authPayload: AuthPayload
+query GetInterests {
+  interests {
+    id
+    name
+    description
+    icon
+  }
 }
 
 """
-Google sign in response
+Get user profile by user ID
 """
-type GoogleSignInPayload {
-  ok: Boolean!
-  authPayload: AuthPayload
-  isNewUser: Boolean
+query GetProfile($userId: ID!) {
+  profile(userId: $userId) {
+    bio
+    location
+    coordinates
+    hasLocation
+    interests {
+      id
+      name
+      description
+      icon
+    }
+    isOnboardingCompleted
+    isProfilePublic
+    paymentPlan
+    isPremium
+    theme
+  }
 }
 
 """
-Sign out response
+Get user by ID (admin or self only)
 """
-type SignOutPayload {
-  ok: Boolean!
+query GetUser($id: ID!) {
+  user(id: $id) {
+    id
+    email
+    firstName
+    lastName
+    fullName
+    profilePicture
+    isActive
+    isEmailVerified
+    authProvider
+    dateJoined
+  }
 }
 
 """
-Token refresh response
+Get current authenticated user
+Requires valid access token in Authorization header
 """
-type RefreshTokenPayload {
-  ok: Boolean!
-  accessToken: String
-  refreshToken: String
-  expiresIn: Int
+query User {
+  user {
+    id
+    email
+    firstName
+    lastName
+    fullName
+    profilePicture
+    isEmailVerified
+    authProvider
+    dateJoined
+    lastLoginAt
+    profile {
+      bio
+      location
+      coordinates
+      hasLocation
+      timezone
+      birthDate
+      phoneNumber
+      isOnboardingCompleted
+      isProfilePublic
+      allowEmailNotifications
+      allowPushNotifications
+      calendarIntegrated
+      calendarProvider
+      paymentPlan
+      isPremium
+      subscriptionExpiresAt
+      interests {
+        id
+        name
+        icon
+      }
+      theme
+      lastActiveAt
+      loginCount
+    }
+    activeSessions {
+      id
+      deviceInfo
+      ipAddress
+      isActive
+      createdAt
+      lastActiveAt
+    }
+    sessionCount
+  }
 }
 
 # -----------------------------------------------------------------------------
-# Mutation Type
+# Fragments (Alphabetical Order)
 # -----------------------------------------------------------------------------
 
-type Mutation {
-  """
-  Sign up with email and password
-  """
-  signUp(
-    email: String!
-    password: String!
-    firstName: String!
-    lastName: String
-  ): SignUpPayload!
+"""Auth payload fields"""
+fragment AuthPayloadFields on AuthPayload {
+  accessToken
+  sessionToken
+  refreshToken
+  expiresIn
+  user {
+    ...AuthUser
+  }
+}
 
-  """
-  Sign in with email and password
-  """
-  signIn(email: String!, password: String!): SignInPayload!
+"""Auth user fields (after login)"""
+fragment AuthUser on User {
+  ...UserBasic
+  isEmailVerified
+  authProvider
+  profile {
+    isOnboardingCompleted
+    isPremium
+  }
+}
 
-  """
-  Sign in with Google OAuth ID token
-  """
-  googleSignIn(idToken: String!): GoogleSignInPayload!
+"""Full user profile"""
+fragment FullProfile on UserProfile {
+  bio
+  location
+  coordinates
+  hasLocation
+  searchRadiusKm
+  timezone
+  birthDate
+  phoneNumber
+  interests {
+    id
+    name
+    icon
+  }
+  isOnboardingCompleted
+  isProfilePublic
+  allowEmailNotifications
+  allowPushNotifications
+  calendarIntegrated
+  calendarProvider
+  paymentPlan
+  isPremium
+  subscriptionExpiresAt
+  theme
+  lastActiveAt
+  loginCount
+}
 
-  """
-  Sign out from current device
-  """
-  signOut(refreshToken: String!): SignOutPayload!
-
-  """
-  Sign out from all devices
-  """
-  signOutAll(refreshToken: String!): SignOutPayload!
-
-  """
-  Refresh access token using refresh token
-  """
-  refreshAccessToken(refreshToken: String!): RefreshTokenPayload!
-
-  """
-  Complete user onboarding
-  """
-  completeOnboarding: Boolean
+"""Basic user fields"""
+fragment UserBasic on User {
+  id
+  email
+  firstName
+  lastName
+  fullName
+  profilePicture
 }
 
 # -----------------------------------------------------------------------------
-# Schema Definition
+# Example Usage with Variables
 # -----------------------------------------------------------------------------
 
-schema {
-  query: Query
-  mutation: Mutation
-}
+# GoogleSignIn Example:
+# Variables: { "idToken": "eyJhbGciOiJSUzI1NiIsInR5cCI6..." }
+
+# RefreshAccessToken Example:
+# Variables: { "refreshToken": "your-refresh-token-here" }
+
+# SignIn Example:
+# Variables: { "email": "user@example.com", "password": "SecurePass123!" }
+
+# SignOut Example:
+# Variables: { "refreshToken": "your-refresh-token-here" }
+
+# SignUp Example:
+# Variables: { "email": "user@example.com", "password": "SecurePass123!", "firstName": "John", "lastName": "Doe" }

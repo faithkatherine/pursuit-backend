@@ -174,6 +174,7 @@ class UserProfile(models.Model):
 
     # Onboarding and preferences
     is_onboarding_completed = models.BooleanField(default=False)
+    has_skipped_onboarding = models.BooleanField(default=False)
     interests = models.ManyToManyField('Interest', blank=True, related_name='users', help_text="User's selected interests for personalization")
 
     # Privacy settings

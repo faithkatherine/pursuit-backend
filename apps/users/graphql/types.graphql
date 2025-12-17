@@ -1,0 +1,262 @@
+# =============================================================================
+# Pursuit Backend - User Schema Definition Language (SDL)
+# =============================================================================
+# This file defines the complete GraphQL schema for the users module
+# Use this as documentation and for client code generation
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Scalar Types
+# -----------------------------------------------------------------------------
+
+"""
+Date scalar (YYYY-MM-DD)
+"""
+scalar Date
+
+"""
+DateTime scalar (ISO 8601)
+"""
+scalar DateTime
+
+"""
+UUID scalar
+"""
+scalar UUID
+
+# -----------------------------------------------------------------------------
+# Types (Alphabetical Order)
+# -----------------------------------------------------------------------------
+
+"""
+Authentication payload returned after successful auth
+"""
+type AuthPayload {
+  accessToken: String!
+  sessionToken: String!
+  refreshToken: String!
+  expiresIn: Int!
+  user: User!
+}
+
+"""
+Google sign in response
+"""
+type GoogleSignInPayload {
+  ok: Boolean!
+  authPayload: AuthPayload
+  isNewUser: Boolean
+}
+
+"""
+Interest category for user preferences
+"""
+type Interest {
+  id: ID!
+  name: String!
+  description: String
+  icon: String
+}
+
+"""
+Token refresh response
+"""
+type RefreshTokenPayload {
+  ok: Boolean!
+  accessToken: String
+  refreshToken: String
+  expiresIn: Int
+}
+
+"""
+Sign in response
+"""
+type SignInPayload {
+  ok: Boolean!
+  authPayload: AuthPayload
+}
+
+"""
+Sign out response
+"""
+type SignOutPayload {
+  ok: Boolean!
+}
+
+"""
+Sign up response
+"""
+type SignUpPayload {
+  ok: Boolean!
+  authPayload: AuthPayload
+  userExists: Boolean
+  requiresVerification: Boolean
+}
+
+"""
+User account
+"""
+type User {
+  id: ID!
+  email: String!
+  username: String!
+  firstName: String!
+  lastName: String
+
+  # Computed fields
+  fullName: String!
+  name: String!
+
+  # Profile
+  profilePicture: String
+  profile: UserProfile
+
+  # Status
+  isActive: Boolean!
+  isEmailVerified: Boolean!
+  authProvider: String!
+
+  # Sessions
+  activeSessions: [UserSession!]
+  sessionCount: Int!
+
+  # Timestamps
+  dateJoined: DateTime!
+  updatedAt: DateTime!
+  lastLoginAt: DateTime
+}
+
+"""
+User profile containing preferences and settings
+"""
+type UserProfile {
+  # Bio & Location
+  bio: String
+  location: String
+  homeLatitude: Float
+  homeLongitude: Float
+  coordinates: [Float]
+  hasLocation: Boolean!
+  searchRadiusKm: Int
+  timezone: String
+
+  # Personal Info
+  birthDate: Date
+  phoneNumber: String
+
+  # Preferences
+  interests: [Interest!]
+  isOnboardingCompleted: Boolean!
+  isProfilePublic: Boolean!
+
+  # Notifications
+  allowEmailNotifications: Boolean!
+  allowPushNotifications: Boolean!
+
+  # Calendar Integration
+  calendarIntegrated: Boolean!
+  calendarProvider: String
+  calendarLastSyncedAt: DateTime
+
+  # Subscription
+  paymentPlan: String!
+  subscriptionExpiresAt: DateTime
+  lastBillingDate: DateTime
+  isPremium: Boolean!
+
+  # Activity
+  lastActiveAt: DateTime
+  loginCount: Int!
+
+  # Appearance
+  theme: String!
+
+  # Timestamps
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+"""
+User session representing a logged-in device
+"""
+type UserSession {
+  id: ID!
+  sessionToken: String!
+  deviceInfo: String
+  ipAddress: String
+  userAgent: String
+  isActive: Boolean!
+  createdAt: DateTime!
+  lastActiveAt: DateTime!
+}
+
+# -----------------------------------------------------------------------------
+# Query Type
+# -----------------------------------------------------------------------------
+
+type Query {
+  """
+  Get current authenticated user
+  """
+  user: User
+
+  """
+  Get current authenticated user's profile
+  """
+  userProfile: UserProfile
+}
+
+# -----------------------------------------------------------------------------
+# Mutation Type
+# -----------------------------------------------------------------------------
+
+type Mutation {
+  """
+  Complete user onboarding
+  """
+  completeOnboarding: Boolean
+
+  """
+  Sign in with Google OAuth ID token
+  """
+  googleSignIn(idToken: String!): GoogleSignInPayload!
+
+  """
+  Refresh access token using refresh token
+  """
+  refreshAccessToken(refreshToken: String!): RefreshTokenPayload!
+
+  """
+  Sign in with email and password
+  """
+  signIn(email: String!, password: String!): SignInPayload!
+
+  """
+  Sign out from current device
+  """
+  signOut(refreshToken: String!): SignOutPayload!
+
+  """
+  Sign out from all devices
+  """
+  signOutAll(refreshToken: String!): SignOutPayload!
+
+  """
+  Sign up with email and password
+  """
+  signUp(
+    email: String!
+    password: String!
+    firstName: String!
+    lastName: String
+  ): SignUpPayload!
+}
+
+# -----------------------------------------------------------------------------
+# Schema Definition
+# -----------------------------------------------------------------------------
+
+schema {
+  query: Query
+  mutation: Mutation
+}
