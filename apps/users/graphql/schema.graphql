@@ -232,6 +232,7 @@ query User {
       birthDate
       phoneNumber
       isOnboardingCompleted
+      hasSkippedOnboarding
       isProfilePublic
       allowEmailNotifications
       allowPushNotifications
@@ -303,6 +304,7 @@ fragment FullProfile on UserProfile {
     icon
   }
   isOnboardingCompleted
+  hasSkippedOnboarding
   isProfilePublic
   allowEmailNotifications
   allowPushNotifications

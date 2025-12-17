@@ -147,6 +147,7 @@ type UserProfile {
   # Preferences
   interests: [Interest!]
   isOnboardingCompleted: Boolean!
+  hasSkippedOnboarding: Boolean!
   isProfilePublic: Boolean!
 
   # Notifications
