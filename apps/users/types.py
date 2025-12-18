@@ -37,7 +37,7 @@ class UserProfileType(DjangoObjectType):
         fields = (
             'bio', 'location', 'home_latitude', 'home_longitude',
             'search_radius_km', 'timezone', 'birth_date', 'phone_number',
-            'is_onboarding_completed', 'has_skipped_onboarding' 'is_profile_public',
+            'is_onboarding_completed', 'has_skipped_onboarding', 'is_profile_public',
             'allow_email_notifications', 'allow_push_notifications',
             'calendar_integrated', 'calendar_provider', 'calendar_last_synced_at',
             'payment_plan', 'subscription_expires_at', 'last_billing_date',

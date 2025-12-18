@@ -168,7 +168,7 @@ AUTH_USER_MODEL = 'users.User'
 GRAPHENE = {
     'SCHEMA': 'pursuit_backend.schema.schema',
     'MIDDLEWARE': [
-        'graphql_jwt.middleware.JSONWebTokenMiddleware',
+        'apps.users.middleware.JWTAuthenticationMiddleware',
     ],
 }
 

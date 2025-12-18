@@ -130,6 +130,35 @@ mutation SignUp($email: String!, $password: String!, $firstName: String!, $lastN
   }
 }
 
+""" Skip onboarding process
+"""
+
+  mutation SkipOnboarding {
+    skipOnboarding {
+      ok
+      user {
+        id
+        email
+        firstName
+        lastName
+        fullName
+        username
+        isEmailVerified
+        isActive
+        authProvider
+        dateJoined
+        updatedAt
+        profilePicture
+        profile {
+          hasSkippedOnboarding
+          isOnboardingCompleted
+          bio
+          location
+        }
+      }
+    }
+  }
+
 # -----------------------------------------------------------------------------
 # Queries (Alphabetical Order)
 # -----------------------------------------------------------------------------
@@ -263,33 +292,21 @@ query User {
 }
 
 # -----------------------------------------------------------------------------
-# Fragments (Alphabetical Order)
+# Fragments (Dependency Order)
 # -----------------------------------------------------------------------------
 
-"""Auth payload fields"""
-fragment AuthPayloadFields on AuthPayload {
-  accessToken
-  sessionToken
-  refreshToken
-  expiresIn
-  user {
-    ...AuthUser
-  }
-}
-
-"""Auth user fields (after login)"""
-fragment AuthUser on User {
-  ...UserBasic
-  isEmailVerified
-  authProvider
-  profile {
-    isOnboardingCompleted
-    isPremium
-  }
+"""Basic user fields"""
+fragment UserBasic on UserType {
+  id
+  email
+  firstName
+  lastName
+  fullName
+  profilePicture
 }
 
 """Full user profile"""
-fragment FullProfile on UserProfile {
+fragment FullProfile on UserProfileType {
   bio
   location
   coordinates
@@ -318,14 +335,27 @@ fragment FullProfile on UserProfile {
   loginCount
 }
 
-"""Basic user fields"""
-fragment UserBasic on User {
-  id
-  email
-  firstName
-  lastName
-  fullName
-  profilePicture
+"""Auth user fields (after login)"""
+fragment AuthUser on UserType {
+  ...UserBasic
+  isEmailVerified
+  authProvider
+  profile {
+    isOnboardingCompleted
+    hasSkippedOnboarding
+    isPremium
+  }
+}
+
+"""Auth payload fields"""
+fragment AuthPayloadFields on AuthPayloadType {
+  accessToken
+  sessionToken
+  refreshToken
+  expiresIn
+  user {
+    ...AuthUser
+  }
 }
 
 # -----------------------------------------------------------------------------
@@ -346,3 +376,4 @@ fragment UserBasic on User {
 
 # SignUp Example:
 # Variables: { "email": "user@example.com", "password": "SecurePass123!", "firstName": "John", "lastName": "Doe" }
+

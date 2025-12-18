@@ -436,7 +436,23 @@ class SignUp(graphene.Mutation):
             )
         except Exception as e:
             raise GraphQLError(message=str(e))
+        
+class SkipOnboarding(graphene.Mutation):
 
+    """Skip onboarding mutation"""
+    user = graphene.Field(UserType)
+    ok = graphene.Boolean()
+
+    def mutate(self, info):
+        user = info.context.user
+        if user.is_anonymous:
+            raise GraphQLError(message="Not authenticated", extensions={"code": "NOT_AUTHENTICATED"})
+
+        # Skip onboarding logic here
+        user.profile.has_skipped_onboarding = True
+        user.profile.save()
+
+        return SkipOnboarding(ok=True, user=user)
 
 # =============================================================================
 # Combined Query and Mutation Classes
@@ -471,3 +487,4 @@ class UserMutations(graphene.ObjectType):
     sign_out = SignOut.Field()
     sign_out_all = SignOutAll.Field()
     sign_up = SignUp.Field()
+    skip_onboarding = SkipOnboarding.Field()

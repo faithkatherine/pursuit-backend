@@ -251,6 +251,11 @@ type Mutation {
     firstName: String!
     lastName: String
   ): SignUpPayload!
+
+  """
+  Skip onboarding process
+  """
+  skipOnboarding: Boolean
 }
 
 # -----------------------------------------------------------------------------

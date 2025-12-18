@@ -46,7 +46,7 @@ class UserAdmin(BaseUserAdmin):
 class UserProfileAdmin(admin.ModelAdmin):
     """User profile admin"""
 
-    list_display = ['user', 'location', 'is_profile_public', 'payment_plan', 'is_onboarding_completed', 'created_at']
+    list_display = ['user', 'location', 'is_profile_public', 'payment_plan', 'has_skipped_onboarding', 'is_onboarding_completed',  'created_at']
     list_filter = ['is_profile_public', 'allow_email_notifications', 'allow_push_notifications', 'payment_plan', 'is_onboarding_completed']
     search_fields = ['user__email', 'user__first_name', 'user__last_name', 'location']
     readonly_fields = ['created_at', 'updated_at']
@@ -59,7 +59,7 @@ class UserProfileAdmin(admin.ModelAdmin):
             'fields': ('location', 'home_latitude', 'home_longitude', 'search_radius_km', 'timezone')
         }),
         (_('Onboarding'), {
-            'fields': ('is_onboarding_completed', 'interests')
+            'fields': ('has_skipped_onboarding', 'is_onboarding_completed', 'interests')
         }),
         (_('Privacy'), {
             'fields': ('is_profile_public', 'allow_email_notifications', 'allow_push_notifications')
