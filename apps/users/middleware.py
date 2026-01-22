@@ -7,12 +7,28 @@ from .authentication import JWTAuthentication
 class JWTAuthenticationMiddleware:
     """Custom GraphQL middleware to authenticate users via JWT"""
 
+    # Mutations that don't require authentication
+    PUBLIC_MUTATIONS = {
+        'signIn',
+        'signUp',
+        'googleSignIn',
+        'refreshAccessToken',
+    }
+
     def __init__(self):
         self.auth = JWTAuthentication()
 
     def resolve(self, next, root, info, **args):
         """Authenticate user before resolving GraphQL query"""
         request = info.context
+
+        # Check if this is a public mutation that doesn't require auth
+        operation_name = info.field_name
+        if operation_name in self.PUBLIC_MUTATIONS:
+            # Set anonymous user and allow the mutation to proceed
+            if not hasattr(request, 'user'):
+                request.user = AnonymousUser()
+            return next(root, info, **args)
 
         # Skip if user is already authenticated
         if hasattr(request, 'user') and request.user.is_authenticated:
