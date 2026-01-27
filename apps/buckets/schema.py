@@ -15,11 +15,12 @@ class CategoryType(DjangoObjectType):
 
 class BucketItemType(DjangoObjectType):
     """GraphQL BucketItem type"""
-    
+
     amount = graphene.Float()
     completed = graphene.Boolean()
     image = graphene.String()
-    
+    category_id = graphene.String()
+
     class Meta:
         model = BucketItem
         fields = [
@@ -27,15 +28,18 @@ class BucketItemType(DjangoObjectType):
             'priority', 'difficulty', 'is_completed', 'progress_percentage',
             'category', 'created_at', 'updated_at'
         ]
-    
+
     def resolve_amount(self, info):
         return float(self.estimated_cost) if self.estimated_cost else None
-    
+
     def resolve_completed(self, info):
         return self.is_completed
-    
+
     def resolve_image(self, info):
         return self.get_image_url()
+
+    def resolve_category_id(self, info):
+        return str(self.category_id) if self.category_id else None
 
 
 class BucketListType(DjangoObjectType):
@@ -114,17 +118,20 @@ class AddBucketItem(graphene.Mutation):
 # Queries
 class BucketsQueries(graphene.ObjectType):
     """Buckets GraphQL queries"""
-    
-    bucket_categories = graphene.List(CategoryType)
-    bucket_items = graphene.List(BucketItemType)
-    
-    def resolve_bucket_categories(self, info):
+
+    get_bucket_categories = graphene.List(CategoryType)
+    get_bucket_items = graphene.List(BucketItemType, category_id=graphene.String())
+
+    def resolve_get_bucket_categories(self, info):
         return Category.objects.filter(is_active=True)
-    
-    def resolve_bucket_items(self, info):
+
+    def resolve_get_bucket_items(self, info, category_id=None):
         user = info.context.user
         if user.is_authenticated:
-            return BucketItem.objects.filter(bucket_list__user=user)
+            items = BucketItem.objects.filter(bucket_list__user=user)
+            if category_id:
+                items = items.filter(category_id=category_id)
+            return items
         return []
 
 

@@ -8,9 +8,9 @@ from apps.insights.schema import InsightsQueries
 
 
 class Query(
-    # BucketsQueries,
-    # RecommendationsQueries,
-    # InsightsQueries,
+    BucketsQueries,
+    RecommendationsQueries,
+    InsightsQueries,
     UserQueries,
     graphene.ObjectType
 ):
@@ -24,7 +24,7 @@ class Query(
 
 class Mutation(
     UserMutations,
-    # BucketsMutations,
+    BucketsMutations,
     graphene.ObjectType
 ):
     """Root Mutation combining all app mutations"""

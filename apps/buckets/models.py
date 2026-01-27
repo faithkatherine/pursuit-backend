@@ -53,7 +53,7 @@ class BucketItem(TimeStampedModel):
     notes = models.TextField(blank=True)
     
     # Media
-    image = models.ImageField(upload_to='bucket_items/', blank=True, null=True)
+    image = models.URLField(max_length=500, blank=True, null=True)
     
     # Location and timing
     location = models.CharField(max_length=200, blank=True)
@@ -106,14 +106,14 @@ class BucketItem(TimeStampedModel):
     
     def get_image_url(self):
         """Get image URL or return None"""
-        return self.image.url if self.image else None
+        return self.image if self.image else None
 
 
 class BucketItemPhoto(TimeStampedModel):
     """Additional photos for bucket items"""
-    
+
     bucket_item = models.ForeignKey(BucketItem, on_delete=models.CASCADE, related_name='photos')
-    image = models.ImageField(upload_to='bucket_item_photos/')
+    image = models.URLField(max_length=500)
     caption = models.CharField(max_length=255, blank=True)
     is_primary = models.BooleanField(default=False)
     
@@ -129,12 +129,12 @@ class BucketItemPhoto(TimeStampedModel):
 
 class BucketItemProgress(TimeStampedModel):
     """Track progress updates for bucket items"""
-    
+
     bucket_item = models.ForeignKey(BucketItem, on_delete=models.CASCADE, related_name='progress_updates')
     title = models.CharField(max_length=200)
     description = models.TextField()
     progress_percentage = models.PositiveSmallIntegerField()
-    image = models.ImageField(upload_to='progress_updates/', blank=True, null=True)
+    image = models.URLField(max_length=500, blank=True, null=True)
     
     class Meta:
         db_table = 'buckets_bucket_item_progress'

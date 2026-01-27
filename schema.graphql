@@ -1,0 +1,402 @@
+"""Root Query combining all app queries"""
+type Query {
+  user: UserType
+  userProfile: UserProfileType
+  getInsightsData: InsightsDataType
+  getHome(offset: Int, limit: Int): HomeDataType
+  getRecommendations(offset: Int, limit: Int): [RecommendationType]
+  getBucketCategories: [CategoryType]
+  getBucketItems(categoryId: String): [BucketItemType]
+
+  """API health check"""
+  health: String
+}
+
+"""User GraphQL type"""
+type UserType {
+  """Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only."""
+  username: String!
+  id: UUID!
+  email: String!
+  authProvider: UsersUserAuthProviderChoices!
+  firstName: String!
+  lastName: String
+  profilePicture: String
+  isActive: Boolean!
+  dateJoined: DateTime!
+  updatedAt: DateTime!
+  lastLoginAt: DateTime
+  isEmailVerified: Boolean!
+  profile: UserProfileType
+  fullName: String
+  name: String
+  activeSessions: [UserSessionType]
+  sessionCount: Int
+}
+
+"""
+Leverages the internal Python implementation of UUID (uuid.UUID) to provide native UUID objects
+in fields, resolvers and input.
+"""
+scalar UUID
+
+"""An enumeration."""
+enum UsersUserAuthProviderChoices {
+  """Email"""
+  EMAIL
+
+  """Google SSO"""
+  GOOGLE
+}
+
+"""
+The `DateTime` scalar type represents a DateTime
+value as specified by
+[iso8601](https://en.wikipedia.org/wiki/ISO_8601).
+"""
+scalar DateTime
+
+"""User profile GraphQL type"""
+type UserProfileType {
+  bio: String!
+
+  """City, State/Country display name"""
+  location: String!
+
+  """Latitude coordinate"""
+  homeLatitude: Decimal
+
+  """Longitude coordinate"""
+  homeLongitude: Decimal
+
+  """Default search radius for nearby events in kilometers"""
+  searchRadiusKm: Int!
+  timezone: String!
+  birthDate: Date
+  phoneNumber: String!
+  isOnboardingCompleted: Boolean!
+  hasSkippedOnboarding: Boolean!
+  isProfilePublic: Boolean!
+  allowEmailNotifications: Boolean!
+  allowPushNotifications: Boolean!
+  calendarIntegrated: Boolean!
+  calendarProvider: UsersUserProfileCalendarProviderChoices!
+  calendarLastSyncedAt: DateTime
+  paymentPlan: UsersUserProfilePaymentPlanChoices!
+  subscriptionExpiresAt: DateTime
+  lastBillingDate: DateTime
+  lastActiveAt: DateTime
+  loginCount: Int!
+  theme: UsersUserProfileThemeChoices!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  interests: [InterestType]
+  coordinates: [Float]
+  hasLocation: Boolean
+  isPremium: Boolean
+}
+
+"""The `Decimal` scalar type represents a python Decimal."""
+scalar Decimal
+
+"""
+The `Date` scalar type represents a Date
+value as specified by
+[iso8601](https://en.wikipedia.org/wiki/ISO_8601).
+"""
+scalar Date
+
+"""An enumeration."""
+enum UsersUserProfileCalendarProviderChoices {
+  """None"""
+  NONE
+
+  """Google Calendar"""
+  GOOGLE_CALENDAR
+
+  """Microsoft Outlook"""
+  OUTLOOK
+
+  """Apple Calendar"""
+  APPLE_CALENDAR
+}
+
+"""An enumeration."""
+enum UsersUserProfilePaymentPlanChoices {
+  """Free"""
+  FREE
+
+  """Basic"""
+  BASIC
+
+  """Premium"""
+  PREMIUM
+}
+
+"""An enumeration."""
+enum UsersUserProfileThemeChoices {
+  """Light"""
+  LIGHT
+
+  """Dark"""
+  DARK
+
+  """Auto"""
+  AUTO
+}
+
+"""Interest GraphQL type"""
+type InterestType {
+  id: UUID!
+  name: String!
+  description: String!
+  icon: String
+}
+
+"""User session GraphQL type"""
+type UserSessionType {
+  id: UUID!
+  sessionToken: String!
+  deviceInfo: String!
+  ipAddress: String!
+  createdAt: DateTime!
+  lastActiveAt: DateTime!
+  isActive: Boolean!
+}
+
+"""GraphQL InsightsData type"""
+type InsightsDataType {
+  id: String
+  weather: WeatherType
+  nextDestination: DestinationType
+  progress: ProgressType
+  recentAchievement: String
+}
+
+"""GraphQL Weather type"""
+type WeatherType {
+  city: String
+  condition: String
+  temperature: Float
+}
+
+"""GraphQL Destination type"""
+type DestinationType {
+  location: String
+  daysAway: Int
+}
+
+"""GraphQL Progress type"""
+type ProgressType {
+  remaining: Int
+  completed: Int
+  yearlyGoal: Int
+  percentage: Int
+}
+
+"""GraphQL HomeData type"""
+type HomeDataType {
+  id: String
+  greeting: String
+  timeOfDay: String
+  weather: WeatherType
+  insights: InsightsDataType
+  bucketCategories: [CategoryType]
+  recommendations: [RecommendationType]
+  upcoming: [BucketItemType]
+}
+
+"""GraphQL Category type"""
+type CategoryType {
+  id: UUID!
+  name: String!
+  emoji: String!
+  description: String!
+  color: String!
+}
+
+"""GraphQL Recommendation type"""
+type RecommendationType {
+  id: UUID!
+  createdAt: DateTime!
+  title: String!
+  description: String!
+  location: String!
+  recommendationType: RecommendationsRecommendationRecommendationTypeChoices!
+  estimatedCost: Decimal
+  rating: Float
+  amount: Float
+  date: String
+  image: String
+}
+
+"""An enumeration."""
+enum RecommendationsRecommendationRecommendationTypeChoices {
+  """Destination"""
+  DESTINATION
+
+  """Activity"""
+  ACTIVITY
+
+  """Experience"""
+  EXPERIENCE
+
+  """Event"""
+  EVENT
+}
+
+"""GraphQL BucketItem type"""
+type BucketItemType {
+  id: UUID!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  category: CategoryType
+  title: String!
+  description: String!
+  location: String!
+  estimatedCost: Decimal
+  priority: BucketsBucketItemPriorityChoices!
+  difficulty: BucketsBucketItemDifficultyChoices!
+  isCompleted: Boolean!
+  progressPercentage: Int!
+  amount: Float
+  completed: Boolean
+  image: String
+  categoryId: String
+}
+
+"""An enumeration."""
+enum BucketsBucketItemPriorityChoices {
+  """Low"""
+  LOW
+
+  """Medium"""
+  MEDIUM
+
+  """High"""
+  HIGH
+
+  """Urgent"""
+  URGENT
+}
+
+"""An enumeration."""
+enum BucketsBucketItemDifficultyChoices {
+  """Easy"""
+  EASY
+
+  """Moderate"""
+  MODERATE
+
+  """Challenging"""
+  CHALLENGING
+
+  """Extreme"""
+  EXTREME
+}
+
+"""Root Mutation combining all app mutations"""
+type Mutation {
+  """Add bucket category mutation"""
+  addBucketCategory(emoji: String, name: String!): AddBucketCategory
+
+  """Add bucket item mutation"""
+  addBucketItem(categoryId: String, description: String, estimatedCost: Float, location: String, title: String!): AddBucketItem
+
+  """Complete onboarding mutation"""
+  completeOnboarding(bio: String, interests: [String], location: String): CompleteOnboarding
+
+  """Google sign in mutation - handles both sign up and sign in"""
+  googleSignIn(idToken: String!): GoogleSignIn
+
+  """Get new access token using refresh token"""
+  refreshAccessToken(refreshToken: String!): RefreshAccessToken
+
+  """Sign in mutation"""
+  signIn(email: String!, password: String!): SignIn
+
+  """Sign out mutation - revokes only the current session/device"""
+  signOut(refreshToken: String!): SignOut
+
+  """
+  Sign out from ALL devices - useful for security (password change, account compromise)
+  """
+  signOutAll(refreshToken: String!): SignOutAll
+
+  """Sign up mutation"""
+  signUp(email: String!, firstName: String!, lastName: String, password: String!): SignUp
+
+  """Skip onboarding mutation"""
+  skipOnboarding: SkipOnboarding
+}
+
+"""Add bucket category mutation"""
+type AddBucketCategory {
+  category: CategoryType
+}
+
+"""Add bucket item mutation"""
+type AddBucketItem {
+  bucketItem: BucketItemType
+}
+
+"""Complete onboarding mutation"""
+type CompleteOnboarding {
+  ok: Boolean
+}
+
+"""Google sign in mutation - handles both sign up and sign in"""
+type GoogleSignIn {
+  ok: Boolean
+  authPayload: AuthPayloadType
+}
+
+"""Standard auth response"""
+type AuthPayloadType {
+  accessToken: String!
+  sessionToken: String!
+  refreshToken: String!
+  expiresIn: Int
+  user: UserType!
+}
+
+"""Get new access token using refresh token"""
+type RefreshAccessToken {
+  ok: Boolean
+  accessToken: String
+  refreshToken: String
+  expiresIn: Int
+}
+
+"""Sign in mutation"""
+type SignIn {
+  ok: Boolean
+  authPayload: AuthPayloadType
+}
+
+"""Sign out mutation - revokes only the current session/device"""
+type SignOut {
+  ok: Boolean
+}
+
+"""
+Sign out from ALL devices - useful for security (password change, account compromise)
+"""
+type SignOutAll {
+  ok: Boolean
+}
+
+"""Sign up mutation"""
+type SignUp {
+  ok: Boolean
+  authPayload: AuthPayloadType
+  errors: [String]
+  userExists: Boolean
+  requiresVerification: Boolean
+}
+
+"""Skip onboarding mutation"""
+type SkipOnboarding {
+  user: UserType
+  ok: Boolean
+}

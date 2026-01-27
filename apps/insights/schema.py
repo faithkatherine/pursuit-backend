@@ -55,23 +55,23 @@ class HomeDataType(graphene.ObjectType):
 
 class InsightsQueries(graphene.ObjectType):
     """Insights GraphQL queries"""
-    
-    insights_data = graphene.Field(InsightsDataType)
-    home = graphene.Field(HomeDataType)
-    
-    def resolve_insights_data(self, info):
+
+    get_insights_data = graphene.Field(InsightsDataType)
+    get_home = graphene.Field(HomeDataType, offset=graphene.Int(), limit=graphene.Int())
+
+    def resolve_get_insights_data(self, info):
         user = info.context.user
         if not user.is_authenticated:
             return None
-        
+
         # Get or create user insight
         insight, created = UserInsight.objects.get_or_create(user=user)
-        
+
         # Get weather data (mock for now)
         weather = WeatherData.objects.filter(city=insight.current_city or 'New York').first()
         if not weather:
             weather = WeatherData(city='New York', condition='Sunny', temperature=72)
-        
+
         return InsightsDataType(
             id=str(insight.id),
             weather=WeatherType(
@@ -91,23 +91,23 @@ class InsightsQueries(graphene.ObjectType):
             ),
             recent_achievement=insight.recent_achievement or 'Visited 3 new cities this month!'
         )
-    
-    def resolve_home(self, info):
+
+    def resolve_get_home(self, info, offset=0, limit=10):
         user = info.context.user
         if not user.is_authenticated:
             return None
-        
+
         # Get home data
         home_data, created = HomeData.objects.get_or_create(user=user)
-        
+
         # Get insight data
         insight, created = UserInsight.objects.get_or_create(user=user)
-        
+
         # Get weather data
         weather = WeatherData.objects.filter(city=insight.current_city or 'New York').first()
         if not weather:
             weather = WeatherData(city='New York', condition='Sunny', temperature=72)
-        
+
         return HomeDataType(
             id=str(home_data.id),
             greeting=f"Hello, {user.first_name}",

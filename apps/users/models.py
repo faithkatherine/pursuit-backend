@@ -58,7 +58,7 @@ class User(AbstractUser):
     # Personal information
     first_name = models.CharField(_('first name'), max_length=150, blank=False)
     last_name = models.CharField(_('last name'), max_length=150, blank=True, null=True)
-    profile_picture = models.ImageField(upload_to='profile_pictures/', blank=True, null=True)
+    profile_picture = models.URLField(max_length=500, blank=True, null=True)
 
     # Status fields
     is_active = models.BooleanField(default=True)

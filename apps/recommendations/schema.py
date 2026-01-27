@@ -29,8 +29,8 @@ class RecommendationType(DjangoObjectType):
 
 class RecommendationsQueries(graphene.ObjectType):
     """Recommendations GraphQL queries"""
-    
-    recommendations = graphene.List(RecommendationType)
-    
-    def resolve_recommendations(self, info):
-        return Recommendation.objects.filter(is_active=True, is_featured=True)[:10]
+
+    get_recommendations = graphene.List(RecommendationType, offset=graphene.Int(), limit=graphene.Int())
+
+    def resolve_get_recommendations(self, info, offset=0, limit=10):
+        return Recommendation.objects.filter(is_active=True, is_featured=True)[offset:offset+limit]

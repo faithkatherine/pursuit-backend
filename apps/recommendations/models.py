@@ -17,8 +17,8 @@ class Recommendation(TimeStampedModel):
     
     title = models.CharField(max_length=200)
     description = models.TextField()
-    image = models.ImageField(upload_to='recommendations/', blank=True, null=True)
-    
+    image = models.URLField(max_length=200, blank=True, null=True)
+
     # Location
     location = models.CharField(max_length=200)
     latitude = models.DecimalField(max_digits=10, decimal_places=8, blank=True, null=True)
@@ -75,7 +75,7 @@ class Recommendation(TimeStampedModel):
     
     def get_image_url(self):
         """Get image URL or return None"""
-        return self.image.url if self.image else None
+        return self.image if self.image else None
 
 
 class UserRecommendation(TimeStampedModel):
