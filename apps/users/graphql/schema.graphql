@@ -6,6 +6,43 @@
 # Mutations (Alphabetical Order)
 # -----------------------------------------------------------------------------
 
+""" 
+Complete onboarding process
+Allows user to set preferences and profile details after initial sign up
+Accepts optional fields for location, interests, and notification settings
+"""
+mutation CompleteOnboarding(
+  $allowLocationSharing?: Boolean
+  $locationName?: String
+  $location?: [Float]  # Expecting [latitude, longitude]
+  $allowPushNotifications?: Boolean
+  $allowEmailNotifications?: Boolean
+  $interests?: [String]
+) {
+  completeOnboarding(
+    allowLocationSharing: $allowLocationSharing
+    locationName: $locationName
+    location: $location
+    allowPushNotifications: $allowPushNotifications
+    allowEmailNotifications: $allowEmailNotifications
+    interests: $interests
+  ) {
+    ok
+    user {
+      id
+      email
+      firstName
+      lastName
+      fullName
+      isEmailVerified
+      authProvider
+      profile {
+        isOnboardingCompleted
+      }
+    }
+  }
+}
+
 """
 Sign in with Google OAuth
 Handles both new user registration and existing user login

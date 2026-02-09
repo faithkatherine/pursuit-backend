@@ -1,7 +1,8 @@
 import graphene
 import uuid
 from datetime import timedelta
-from apps.users.models import User as UserModel, UserProfile as UserProfileModel, UserSession as UserSessionModel, RefreshToken
+from django.contrib.gis.geos import Point
+from apps.users.models import User as UserModel, UserProfile as UserProfileModel, UserSession as UserSessionModel, RefreshToken, Interest
 from apps.users.authentication import JWTService
 from apps.users.types import AuthPayloadType,  UserProfileType, UserType
 from django.utils import timezone
@@ -66,20 +67,43 @@ def verify_google_token(token):
 class CompleteOnboarding(graphene.Mutation):
     """Complete onboarding mutation"""
     class Arguments:
-        interests = graphene.List(graphene.String)  # List of interest names/IDs
-        bio = graphene.String()
-        location = graphene.String()
+        allow_location_sharing = graphene.Boolean()
+        location_name = graphene.String()
+        location = graphene.List(graphene.Float)  # Expecting [latitude, longitude]
+        allow_push_notifications = graphene.Boolean()
+        allow_email_notifications = graphene.Boolean()
+        interests = graphene.List(graphene.String)  # List of interest IDs
 
     ok = graphene.Boolean()
+    user = graphene.Field(UserType)
 
-    def mutate(self, info, interests=None, bio=None, location=None):
-        # TODO: Implement onboarding completion
-        # 1. Get authenticated user from context
-        # 2. Update UserProfile with bio, location
-        # 3. Add interests to user
-        # 4. Mark onboarding as complete
-        raise GraphQLError(message="Not implemented yet", extensions={"code": "NOT_IMPLEMENTED"})
+    def mutate(self, info, allow_location_sharing=None, location_name=None, location=None, allow_push_notifications=None, allow_email_notifications=None, interests=None):
+        user = info.context.user
+        if user.is_anonymous:
+            raise GraphQLError(message="Not authenticated", extensions={"code": "NOT_AUTHENTICATED"})
 
+        profile = user.profile
+
+        if allow_location_sharing is not None:
+            profile.allow_location_sharing = allow_location_sharing
+        if location_name is not None:
+            profile.location_name = location_name
+        if location is not None and len(location) == 2:
+            latitude, longitude = location
+            profile.location = Point(longitude, latitude, srid=4326)
+        if allow_push_notifications is not None:
+            profile.allow_push_notifications = allow_push_notifications
+        if allow_email_notifications is not None:
+            profile.allow_email_notifications = allow_email_notifications
+
+        profile.is_onboarding_completed = True
+        profile.save()
+
+        if interests is not None:
+            interest_objs = Interest.objects.filter(id__in=interests)
+            profile.interests.set(interest_objs)
+
+        return CompleteOnboarding(ok=True, user=user)
 
 class GoogleSignIn(graphene.Mutation):
     """Google sign in mutation - handles both sign up and sign in"""

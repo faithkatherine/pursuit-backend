@@ -35,7 +35,7 @@ class UserProfileType(DjangoObjectType):
     class Meta:
         model = UserProfileModel
         fields = (
-            'bio', 'location', 'home_latitude', 'home_longitude',
+            'bio', 'location_name',
             'search_radius_km', 'timezone', 'birth_date', 'phone_number',
             'is_onboarding_completed', 'has_skipped_onboarding', 'is_profile_public',
             'allow_email_notifications', 'allow_push_notifications',

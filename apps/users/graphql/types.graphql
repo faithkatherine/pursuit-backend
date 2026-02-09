@@ -215,7 +215,14 @@ type Mutation {
   """
   Complete user onboarding
   """
-  completeOnboarding: Boolean
+  completeOnboarding(
+    allowLocationSharing: Boolean
+    locationName: String
+    location: Field
+    allowPushNotifications: Boolean
+    allowEmailNotifications: Boolean
+    interests: [String]
+  ): CompleteOnboardingPayload!
 
   """
   Sign in with Google OAuth ID token

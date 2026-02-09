@@ -24,7 +24,7 @@ class BucketItemType(DjangoObjectType):
     class Meta:
         model = BucketItem
         fields = [
-            'id', 'title', 'description', 'location', 'estimated_cost',
+            'id', 'title', 'description', 'location_name', 'estimated_cost',
             'priority', 'difficulty', 'is_completed', 'progress_percentage',
             'category', 'created_at', 'updated_at'
         ]
@@ -88,26 +88,26 @@ class AddBucketItem(graphene.Mutation):
         user = info.context.user
         if not user.is_authenticated:
             raise Exception('Authentication required')
-        
+
         # Get user's default bucket list
         bucket_list, created = BucketList.objects.get_or_create(
             user=user,
             is_default=True,
             defaults={'name': 'My Bucket List'}
         )
-        
+
         category = None
         if category_id:
             try:
                 category = Category.objects.get(id=category_id)
             except Category.DoesNotExist:
                 pass
-        
+
         bucket_item = BucketItem.objects.create(
             bucket_list=bucket_list,
             title=title,
             description=description,
-            location=location,
+            location_name=location,
             estimated_cost=estimated_cost,
             category=category
         )

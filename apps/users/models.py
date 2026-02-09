@@ -1,6 +1,7 @@
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.contrib.auth.hashers import make_password, check_password
-from django.db import models
+from django.contrib.gis.geos import Point
+from django.contrib.gis.db import models
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone as django_timezone
 from django.utils.crypto import get_random_string
@@ -163,9 +164,8 @@ class UserProfile(models.Model):
     bio = models.TextField(blank=True, max_length=500)
     
     # Location fields for geo-based recommendations
-    location = models.CharField(max_length=100, blank=True, help_text="City, State/Country display name")
-    home_latitude = models.DecimalField(max_digits=9, decimal_places=6, blank=True, null=True, help_text="Latitude coordinate")
-    home_longitude = models.DecimalField(max_digits=9, decimal_places=6, blank=True, null=True, help_text="Longitude coordinate")
+    location_name = models.CharField(max_length=100, blank=True, help_text="City, State/Country display name")
+    location = models.PointField(geography=True, null=True, blank=True, srid=4326)
     search_radius_km = models.PositiveIntegerField(default=50, help_text="Default search radius for nearby events in kilometers")
     
     timezone = models.CharField(max_length=50, blank=True, default='UTC')
@@ -179,6 +179,7 @@ class UserProfile(models.Model):
 
     # Privacy settings
     is_profile_public = models.BooleanField(default=True)
+    allow_location_sharing = models.BooleanField(default=True)
     allow_email_notifications = models.BooleanField(default=True)
     allow_push_notifications = models.BooleanField(default=True)
 
@@ -232,19 +233,18 @@ class UserProfile(models.Model):
     @property
     def has_location(self) -> bool:
         """Check if user has set their home coordinates"""
-        return self.home_latitude is not None and self.home_longitude is not None
+        return self.location is not None
 
     @property
     def coordinates(self) -> tuple[float, float] | None:
         """Return (latitude, longitude) tuple or None if not set"""
         if self.has_location:
-            return (float(self.home_latitude), float(self.home_longitude))
+            return (self.location.y, self.location.x)  # PointField stores as (longitude, latitude)
         return None
 
     def set_coordinates(self, latitude: float, longitude: float):
         """Set the user's home coordinates"""
-        self.home_latitude = latitude
-        self.home_longitude = longitude
+        self.location = Point(longitude, latitude)
 
 
 class Interest(models.Model):

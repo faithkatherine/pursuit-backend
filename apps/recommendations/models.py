@@ -1,4 +1,4 @@
-from django.db import models
+from django.contrib.gis.db import models
 from django.contrib.auth import get_user_model
 from apps.core.models import TimeStampedModel, Category
 
@@ -20,9 +20,8 @@ class Recommendation(TimeStampedModel):
     image = models.URLField(max_length=200, blank=True, null=True)
 
     # Location
-    location = models.CharField(max_length=200)
-    latitude = models.DecimalField(max_digits=10, decimal_places=8, blank=True, null=True)
-    longitude = models.DecimalField(max_digits=11, decimal_places=8, blank=True, null=True)
+    location_name = models.CharField(max_length=200)
+    coordinates = models.PointField(geography=True, blank=True, null=True)
     
     # Details
     recommendation_type = models.CharField(max_length=20, choices=RECOMMENDATION_TYPE_CHOICES, default='activity')
@@ -55,13 +54,13 @@ class Recommendation(TimeStampedModel):
         indexes = [
             models.Index(fields=['recommendation_type']),
             models.Index(fields=['category']),
-            models.Index(fields=['location']),
+            models.Index(fields=['location_name']),
             models.Index(fields=['is_featured', 'is_active']),
             models.Index(fields=['-popularity_score']),
         ]
     
     def __str__(self):
-        return f"{self.title} - {self.location}"
+        return f"{self.title} - {self.location_name}"
     
     @property
     def amount(self):

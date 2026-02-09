@@ -13,7 +13,7 @@ class RecommendationType(DjangoObjectType):
     class Meta:
         model = Recommendation
         fields = [
-            'id', 'title', 'description', 'location', 'estimated_cost',
+            'id', 'title', 'description', 'location_name', 'estimated_cost',
             'recommendation_type', 'rating', 'created_at'
         ]
     

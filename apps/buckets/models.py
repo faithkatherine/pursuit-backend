@@ -1,4 +1,4 @@
-from django.db import models
+from django.contrib.gis.db import models
 from django.contrib.auth import get_user_model
 from apps.core.models import TimeStampedModel, Category
 
@@ -56,9 +56,8 @@ class BucketItem(TimeStampedModel):
     image = models.URLField(max_length=500, blank=True, null=True)
     
     # Location and timing
-    location = models.CharField(max_length=200, blank=True)
-    latitude = models.DecimalField(max_digits=10, decimal_places=8, blank=True, null=True)
-    longitude = models.DecimalField(max_digits=11, decimal_places=8, blank=True, null=True)
+    location_name = models.CharField(max_length=200, blank=True)
+    coordinates = models.PointField(geography=True, null=True, blank=True, srid=4326)
     
     # Cost and planning
     estimated_cost = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
@@ -92,7 +91,7 @@ class BucketItem(TimeStampedModel):
             models.Index(fields=['priority']),
             models.Index(fields=['target_date']),
             models.Index(fields=['is_public']),
-            models.Index(fields=['location']),
+            models.Index(fields=['location_name']),
             models.Index(fields=['-created_at']),
         ]
     

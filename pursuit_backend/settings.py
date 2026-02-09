@@ -48,6 +48,7 @@ DJANGO_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.gis',
 ]
 
 THIRD_PARTY_APPS = [
@@ -106,7 +107,7 @@ WSGI_APPLICATION = 'pursuit_backend.wsgi.application'
 # Database Configuration
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.postgresql",
+        "ENGINE": "django.contrib.gis.db.backends.postgis",
         "NAME": config("DB_NAME", default="pursuit_db"),
         "USER": config("DB_USER", default="pursuit_user"),
         "PASSWORD": config("DB_PASSWORD", default="pursuit_password"),
