@@ -4,7 +4,7 @@ from .settings import *
 # Use SQLite for tests
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
+        'ENGINE': 'django.contrib.gis.db.backends.postgis',
         'NAME': ':memory:',
     }
 }
