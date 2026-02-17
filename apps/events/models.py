@@ -1,5 +1,5 @@
 from django.contrib.gis.db import models
-from django.forms import ValidationError
+from django.core.exceptions import ValidationError
 
 
 # Create your models here.
@@ -12,7 +12,7 @@ class Event(models.Model):
     image = models.URLField(null=True, blank=True)
     timezone = models.CharField(max_length=255, null=True, blank=True)
     location_name = models.CharField(max_length=255, null=True, blank=True)
-    location = models.PointField(null=True, blank=True, geography=True)
+    location = models.PointField(null=True, blank=True, geography=True, srid=4326)
     more_details_url = models.URLField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -20,7 +20,8 @@ class Event(models.Model):
     def __str__(self):
         return self.name
     
-    def date_validation(self):
+    def clean(self):
+        super().clean()
         if self.end_date and self.end_date < self.date:
             raise ValidationError('End date cannot be before start date.')
 

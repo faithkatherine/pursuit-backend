@@ -5,12 +5,14 @@ from apps.users.schema import UserQueries, UserMutations
 from apps.buckets.schema import BucketsQueries, BucketsMutations
 from apps.recommendations.schema import RecommendationsQueries
 from apps.insights.schema import InsightsQueries
+from apps.events.schema import EventsQueries
 
 
 class Query(
     BucketsQueries,
     RecommendationsQueries,
     InsightsQueries,
+    EventsQueries,
     UserQueries,
     graphene.ObjectType
 ):

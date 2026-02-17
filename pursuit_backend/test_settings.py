@@ -1,10 +1,10 @@
 # Test settings for Django
 from .settings import *
 
-# Use SQLite for tests
+# Use spatialite for tests
 DATABASES = {
     'default': {
-        'ENGINE': 'django.contrib.gis.db.backends.postgis',
+        'ENGINE': 'django.contrib.gis.db.backends.spatialite',
         'NAME': ':memory:',
     }
 }

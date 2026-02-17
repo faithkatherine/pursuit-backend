@@ -1,11 +1,22 @@
+import graphene
 from graphene_django import DjangoObjectType
-from .models import EventCategory, Event
-
+from .models import Event
 
 
 class EventType(DjangoObjectType):
     """Event GraphQL type"""
 
+    coordinates = graphene.List(graphene.Float)
+
     class Meta:
         model = Event
-        fields = '__all__'
+        fields = (
+            'id', 'name', 'description', 'category', 'date', 'end_date',
+            'image', 'timezone', 'location_name', 'more_details_url',
+            'created_at', 'updated_at',
+        )
+
+    def resolve_coordinates(self, info):
+        if self.location is None:
+            return None
+        return [self.location.y, self.location.x]
