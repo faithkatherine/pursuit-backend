@@ -53,7 +53,7 @@ DJANGO_APPS = [
 
 THIRD_PARTY_APPS = [
     'corsheaders',
-    'rest_framework',
+    #'rest_framework',
     'graphene_django',
     'django_extensions',
     'django_filters',
@@ -65,6 +65,7 @@ LOCAL_APPS = [
     'apps.buckets',
     'apps.recommendations',
     'apps.insights',
+    'apps.events',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
