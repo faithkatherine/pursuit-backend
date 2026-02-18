@@ -1,0 +1,109 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  DJANGO_SETTINGS_MODULE: pursuit_backend.test_settings
+  SECRET_KEY: ci-test-secret-key-not-for-production
+  DB_NAME: pursuit_db
+  DB_USER: pursuit_user
+  DB_PASSWORD: pursuit_password
+  DB_HOST: localhost
+  DB_PORT: 5432
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run flake8
+        run: flake8 --max-line-length=120 --exclude=venv,migrations .
+
+      - name: Check import ordering
+        run: isort --check-only --diff --skip venv --skip migrations .
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgis/postgis:17-3.4
+        env:
+          POSTGRES_DB: pursuit_db
+          POSTGRES_USER: pursuit_user
+          POSTGRES_PASSWORD: pursuit_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gdal-bin libgdal-dev
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Django checks
+        run: python manage.py check
+
+      - name: Run tests
+        run: pytest --cov=apps --cov-report=term-missing
+
+  check-production-validation:
+    name: Production settings validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gdal-bin libgdal-dev
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Verify production settings fail without secrets
+        run: |
+          if DJANGO_SETTINGS_MODULE=pursuit_backend.settings.production python manage.py check 2>&1; then
+            echo "ERROR: Production settings should have failed without secrets!"
+            exit 1
+          else
+            echo "Production settings correctly rejected missing secrets."
+          fi
