@@ -1,5 +1,5 @@
 # Test settings for Django
-from .settings import *
+from .settings.development import *  # noqa: F401,F403
 
 # Use spatialite for tests
 DATABASES = {

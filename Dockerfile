@@ -3,13 +3,16 @@ FROM python:3.11-slim
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    DEBIAN_FRONTEND=noninteractive
+    DEBIAN_FRONTEND=noninteractive \
+    DJANGO_SETTINGS_MODULE=pursuit_backend.settings.production
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     postgresql-client \
     build-essential \
     libpq-dev \
+    gdal-bin \
+    libgdal-dev \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
@@ -27,7 +30,8 @@ COPY . .
 RUN mkdir -p logs
 
 # Collect static files (for production)
-RUN python manage.py collectstatic --noinput --settings=pursuit_backend.settings || true
+RUN DJANGO_SETTINGS_MODULE=pursuit_backend.settings.development \
+    python manage.py collectstatic --noinput || true
 
 # Create entrypoint script
 RUN echo '#!/bin/bash\n\
