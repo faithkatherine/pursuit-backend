@@ -56,6 +56,9 @@ python manage.py migrate --noinput\n\
 # Load initial data\n\
 python manage.py load_initial_data\n\
 \n\
+# Create superuser from env vars (if set)\n\
+python manage.py create_superuser_from_env\n\
+\n\
 # Start server\n\
 exec "$@"' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
