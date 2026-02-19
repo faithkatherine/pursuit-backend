@@ -33,4 +33,5 @@ class Event(models.Model):
         indexes = [
             models.Index(fields=['date']),
             models.Index(fields=['location']),
+            models.Index(fields=['is_active', 'date']),
         ]
