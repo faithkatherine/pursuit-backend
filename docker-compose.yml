@@ -31,7 +31,6 @@ services:
 
   web:
     build: .
-    entrypoint: []
     ports:
       - "8000:8000"
     environment:
@@ -44,6 +43,7 @@ services:
       - REDIS_URL=redis://redis:6379/1
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - RUN_INITIAL_DATA=true
     volumes:
       - .:/app
       - media_files:/app/mediafiles
@@ -56,7 +56,6 @@ services:
 
   celery:
     build: .
-    entrypoint: []
     command: celery -A pursuit_backend worker -l info
     environment:
       - DJANGO_SETTINGS_MODULE=pursuit_backend.settings.development
@@ -78,7 +77,6 @@ services:
 
   celery-beat:
     build: .
-    entrypoint: []
     command: celery -A pursuit_backend beat -l info
     environment:
       - DJANGO_SETTINGS_MODULE=pursuit_backend.settings.development

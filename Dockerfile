@@ -47,8 +47,10 @@ done\n\
 echo "Running migrations..."\n\
 python manage.py migrate --noinput\n\
 \n\
-# Load initial data\n\
-python manage.py load_initial_data\n\
+# Load initial data (only for web/api service, not workers)\n\
+if [ "${RUN_INITIAL_DATA}" = "true" ]; then\n\
+  python manage.py load_initial_data\n\
+fi\n\
 \n\
 # Start server\n\
 exec "$@"' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
