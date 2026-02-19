@@ -37,22 +37,17 @@ RUN DJANGO_SETTINGS_MODULE=pursuit_backend.settings.development \
 RUN echo '#!/bin/bash\n\
 set -e\n\
 \n\
-# Determine database host/port from DATABASE_URL or individual vars\n\
+# Wait for database\n\
 if [ -n "$DATABASE_URL" ]; then\n\
-  _db_host=$(echo "$DATABASE_URL" | sed -n "s|.*@\\([^:/]*\\).*|\\1|p")\n\
-  _db_port=$(echo "$DATABASE_URL" | sed -n "s|.*:\\([0-9]*\\)/.*|\\1|p")\n\
-  _db_host=${_db_host:-localhost}\n\
-  _db_port=${_db_port:-5432}\n\
+  echo "Using DATABASE_URL — managed database, skipping pg_isready."\n\
 else\n\
   _db_host=${DB_HOST:-localhost}\n\
   _db_port=${DB_PORT:-5432}\n\
+  echo "Waiting for database at $_db_host:$_db_port..."\n\
+  while ! pg_isready -h "$_db_host" -p "$_db_port" -q 2>/dev/null; do\n\
+    sleep 1\n\
+  done\n\
 fi\n\
-\n\
-# Wait for database\n\
-echo "Waiting for database at $_db_host:$_db_port..."\n\
-while ! pg_isready -h "$_db_host" -p "$_db_port" -q 2>/dev/null; do\n\
-  sleep 1\n\
-done\n\
 \n\
 # Run migrations\n\
 echo "Running migrations..."\n\

@@ -121,7 +121,7 @@ jobs:
     steps:
       - name: Trigger Render deploy
         run: |
-          curl -sf "${{ secrets.RENDER_STAGING_DEPLOY_HOOK }}" \
+          curl -sSf "${{ secrets.RENDER_STAGING_DEPLOY_HOOK }}" \
             || { echo "Deploy hook failed"; exit 1; }
 
       - name: Wait for deployment
@@ -130,7 +130,7 @@ jobs:
       - name: Health check
         run: |
           for i in 1 2 3 4 5; do
-            status=$(curl -sf "${{ secrets.RENDER_STAGING_URL }}/api/health/" \
+            status=$(curl -sSf "${{ secrets.RENDER_STAGING_URL }}/api/health/" \
                      -o /dev/null -w '%{http_code}' || true)
             if [ "$status" = "200" ]; then
               echo "Staging health check passed."
@@ -155,7 +155,7 @@ jobs:
     steps:
       - name: Trigger Render deploy
         run: |
-          curl -sf "${{ secrets.RENDER_PRODUCTION_DEPLOY_HOOK }}" \
+          curl -sSf "${{ secrets.RENDER_PRODUCTION_DEPLOY_HOOK }}" \
             || { echo "Deploy hook failed"; exit 1; }
 
       - name: Wait for deployment
@@ -164,7 +164,7 @@ jobs:
       - name: Health check
         run: |
           for i in 1 2 3 4 5; do
-            status=$(curl -sf "${{ secrets.RENDER_PRODUCTION_URL }}/api/health/" \
+            status=$(curl -sSf "${{ secrets.RENDER_PRODUCTION_URL }}/api/health/" \
                      -o /dev/null -w '%{http_code}' || true)
             if [ "$status" = "200" ]; then
               echo "Production health check passed."

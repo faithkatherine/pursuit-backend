@@ -15,7 +15,7 @@ GitHub push/tag
 | **Staging** | Push to `main` | Yes | `pursuit_backend.settings.staging` |
 | **Production** | Tag `v*` or manual `workflow_dispatch` | No | `pursuit_backend.settings.production` |
 
-Both environments share a PostGIS database defined in `render.yaml`.
+Each environment has its own isolated PostGIS database defined in `render.yaml`.
 
 ## How Deploys Work
 
@@ -102,7 +102,8 @@ The `render.yaml` file at the project root defines all infrastructure:
 
 - `pursuit-backend-staging` — web service (Docker, auto-deploy from `main`)
 - `pursuit-backend-prod` — web service (Docker, manual deploy)
-- `pursuit-db` — PostGIS-enabled PostgreSQL (free tier)
+- `pursuit-db-staging` — PostGIS-enabled PostgreSQL for staging (free tier)
+- `pursuit-db-prod` — PostGIS-enabled PostgreSQL for production (free tier)
 
 To set up from scratch: Render Dashboard > New > Blueprint > connect this repo.
 

@@ -39,11 +39,12 @@ DJANGO_SETTINGS_MODULE=pursuit_backend.settings.staging python manage.py check
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `DB_NAME` | No | `pursuit_db` | Database name |
-| `DB_USER` | No | `pursuit_user` | Database user |
-| `DB_PASSWORD` | **Prod** | `pursuit_password` | Database password. Production fails if left as default. |
-| `DB_HOST` | No | `localhost` | Database host (`db` in docker-compose) |
-| `DB_PORT` | No | `5432` | Database port |
+| `DATABASE_URL` | **Prod/Staging** | — | Full connection URI (e.g. `postgres://user:pass@host:5432/dbname`). Auto-provided by Render. When set, takes precedence over the individual `DB_*` variables below. |
+| `DB_NAME` | No | `pursuit_db` | Database name (ignored when `DATABASE_URL` is set) |
+| `DB_USER` | No | `pursuit_user` | Database user (ignored when `DATABASE_URL` is set) |
+| `DB_PASSWORD` | **Prod** | `pursuit_password` | Database password. Production fails if left as default (ignored when `DATABASE_URL` is set). |
+| `DB_HOST` | No | `localhost` | Database host (ignored when `DATABASE_URL` is set) |
+| `DB_PORT` | No | `5432` | Database port (ignored when `DATABASE_URL` is set) |
 
 ### JWT Authentication
 
@@ -113,6 +114,6 @@ The production settings module validates on startup that:
 1. `SECRET_KEY` is not the insecure default
 2. `JWT_SECRET_KEY` is set
 3. `ALLOWED_HOSTS` is not empty
-4. `DB_PASSWORD` is not the insecure default
+4. `DB_PASSWORD` is not the insecure default (skipped when `DATABASE_URL` is set)
 
 If any check fails, Django will refuse to start with a clear error message listing all missing/invalid variables.
