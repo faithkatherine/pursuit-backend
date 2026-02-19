@@ -7,6 +7,8 @@ for wsgi.py and asgi.py (i.e., gunicorn deployments).
 
 import os
 
+import dj_database_url
+
 from .base import *  # noqa: F401,F403
 
 DEBUG = False
@@ -33,6 +35,17 @@ SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
+
+# Render (and most PaaS) terminates SSL at the load balancer
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# Database — prefer DATABASE_URL (provided by Render) over individual vars
+_db_url = os.environ.get('DATABASE_URL')
+if _db_url:
+    DATABASES['default'] = dj_database_url.config(
+        default=_db_url,
+        engine='django.contrib.gis.db.backends.postgis',
+    )
 
 # Static files served by WhiteNoise
 STORAGES = {
@@ -63,7 +76,8 @@ if not ALLOWED_HOSTS:
         "ALLOWED_HOSTS must be set in production (comma-separated)."
     )
 
-if os.environ.get('DB_PASSWORD', 'pursuit_password') == 'pursuit_password':
+# Only check DB_PASSWORD when not using DATABASE_URL
+if not _db_url and os.environ.get('DB_PASSWORD', 'pursuit_password') == 'pursuit_password':
     _errors.append(
         "DB_PASSWORD is still the insecure default. "
         "Set a strong DB_PASSWORD env var for production."

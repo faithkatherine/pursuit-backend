@@ -1,10 +1,12 @@
-name: CI
+name: CI & Deploy
 
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 env:
   DJANGO_SETTINGS_MODULE: pursuit_backend.test_settings
@@ -107,3 +109,69 @@ jobs:
           else
             echo "Production settings correctly rejected missing secrets."
           fi
+
+  # ── Deploy: Staging ──────────────────────────────────────────────────
+  deploy-staging:
+    name: Deploy to Staging
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: staging
+
+    steps:
+      - name: Trigger Render deploy
+        run: |
+          curl -sf "${{ secrets.RENDER_STAGING_DEPLOY_HOOK }}" \
+            || { echo "Deploy hook failed"; exit 1; }
+
+      - name: Wait for deployment
+        run: sleep 60
+
+      - name: Health check
+        run: |
+          for i in 1 2 3 4 5; do
+            status=$(curl -sf "${{ secrets.RENDER_STAGING_URL }}/api/health/" \
+                     -o /dev/null -w '%{http_code}' || true)
+            if [ "$status" = "200" ]; then
+              echo "Staging health check passed."
+              exit 0
+            fi
+            echo "Attempt $i: status=$status — retrying in 15s…"
+            sleep 15
+          done
+          echo "Staging health check failed after 5 attempts."
+          exit 1
+
+  # ── Deploy: Production ───────────────────────────────────────────────
+  deploy-production:
+    name: Deploy to Production
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    if: >
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
+      || github.event_name == 'workflow_dispatch'
+    environment: production
+
+    steps:
+      - name: Trigger Render deploy
+        run: |
+          curl -sf "${{ secrets.RENDER_PRODUCTION_DEPLOY_HOOK }}" \
+            || { echo "Deploy hook failed"; exit 1; }
+
+      - name: Wait for deployment
+        run: sleep 60
+
+      - name: Health check
+        run: |
+          for i in 1 2 3 4 5; do
+            status=$(curl -sf "${{ secrets.RENDER_PRODUCTION_URL }}/api/health/" \
+                     -o /dev/null -w '%{http_code}' || true)
+            if [ "$status" = "200" ]; then
+              echo "Production health check passed."
+              exit 0
+            fi
+            echo "Attempt $i: status=$status — retrying in 15s…"
+            sleep 15
+          done
+          echo "Production health check failed after 5 attempts."
+          exit 1

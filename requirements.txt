@@ -13,6 +13,7 @@ google-auth>=2.27.0
 
 # Database
 psycopg2-binary>=2.9.9
+dj-database-url>=2.1.0
 
 # Configuration
 python-decouple>=3.8
