@@ -1,11 +1,17 @@
 # Test settings for Django
+import os
+
 from .settings.development import *  # noqa: F401,F403
 
-# Use spatialite for tests
+# Use PostGIS for tests (matches CI service container)
 DATABASES = {
     'default': {
-        'ENGINE': 'django.contrib.gis.db.backends.spatialite',
-        'NAME': ':memory:',
+        'ENGINE': 'django.contrib.gis.db.backends.postgis',
+        'NAME': os.environ.get('DB_NAME', 'pursuit_db'),
+        'USER': os.environ.get('DB_USER', 'pursuit_user'),
+        'PASSWORD': os.environ.get('DB_PASSWORD', 'pursuit_password'),
+        'HOST': os.environ.get('DB_HOST', 'localhost'),
+        'PORT': os.environ.get('DB_PORT', '5432'),
     }
 }
 
