@@ -1,11 +1,10 @@
 import graphene
-from graphene_django import DjangoObjectType
 
-from apps.users.schema import UserQueries, UserMutations
-from apps.buckets.schema import BucketsQueries, BucketsMutations
-from apps.recommendations.schema import RecommendationsQueries
-from apps.insights.schema import InsightsQueries
+from apps.buckets.schema import BucketsMutations, BucketsQueries
 from apps.events.schema import EventsQueries
+from apps.insights.schema import InsightsQueries
+from apps.recommendations.schema import RecommendationsQueries
+from apps.users.schema import UserMutations, UserQueries
 
 
 class Query(

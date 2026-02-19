@@ -1,9 +1,10 @@
-from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
+from django.core.management.base import BaseCommand
+
+from apps.buckets.models import BucketItem, BucketList
 from apps.core.models import Category
-from apps.buckets.models import BucketList, BucketItem
+from apps.insights.models import UserInsight, WeatherData
 from apps.recommendations.models import Recommendation
-from apps.insights.models import WeatherData, UserInsight
 
 User = get_user_model()
 

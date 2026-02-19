@@ -7,4 +7,4 @@ class UsersConfig(AppConfig):
 
     def ready(self):
         """Import signals when app is ready"""
-        import apps.users.signals
+        import apps.users.signals  # noqa: F401

@@ -33,7 +33,7 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 # Database — prefer DATABASE_URL (provided by Render) over individual vars
 _db_url = os.environ.get('DATABASE_URL')
 if _db_url:
-    DATABASES['default'] = dj_database_url.config(
+    DATABASES['default'] = dj_database_url.config(  # noqa: F405
         default=_db_url,
         engine='django.contrib.gis.db.backends.postgis',
     )

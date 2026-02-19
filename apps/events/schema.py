@@ -1,6 +1,7 @@
-from .types import EventType
-from .models import Event
 import graphene
+
+from .models import Event
+from .types import EventType
 
 MAX_LIMIT = 100
 

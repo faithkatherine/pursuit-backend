@@ -1,12 +1,13 @@
+import hashlib
+import uuid
+
 from django.contrib.auth.models import AbstractUser, BaseUserManager
-from django.contrib.auth.hashers import make_password, check_password
-from django.contrib.gis.geos import Point
 from django.contrib.gis.db import models
-from django.utils.translation import gettext_lazy as _
+from django.contrib.gis.geos import Point
 from django.utils import timezone as django_timezone
 from django.utils.crypto import get_random_string
-import uuid
-import hashlib
+from django.utils.translation import gettext_lazy as _
+
 
 class UserManager(BaseUserManager):
     """Custom user manager where email is the unique identifier"""
@@ -36,6 +37,7 @@ class UserManager(BaseUserManager):
 
         return self.create_user(email, password, **extra_fields)
 
+
 class User(AbstractUser):
     """Custom user model extending Django's AbstractUser, supporting Google OAuth and email/password authentication"""
 
@@ -54,7 +56,10 @@ class User(AbstractUser):
         choices=AUTH_PROVIDER_CHOICES,
         default='email',
     )
-    provider_id = models.CharField(max_length=255, blank=True, null=True, help_text="ID from the authentication provider")
+    provider_id = models.CharField(
+        max_length=255, blank=True, null=True,
+        help_text="ID from the authentication provider"
+    )
 
     # Personal information
     first_name = models.CharField(_('first name'), max_length=150, blank=False)
@@ -72,9 +77,15 @@ class User(AbstractUser):
 
     # Security and verification
     is_email_verified = models.BooleanField(default=False)
-    email_verification_token_hash = models.CharField(max_length=64, blank=True, null=True, help_text="SHA-256 hash of verification token")
+    email_verification_token_hash = models.CharField(
+        max_length=64, blank=True, null=True,
+        help_text="SHA-256 hash of verification token"
+    )
     email_verification_sent_at = models.DateTimeField(blank=True, null=True)
-    password_reset_token_hash = models.CharField(max_length=64, blank=True, null=True, help_text="SHA-256 hash of reset token")
+    password_reset_token_hash = models.CharField(
+        max_length=64, blank=True, null=True,
+        help_text="SHA-256 hash of reset token"
+    )
     password_reset_expires = models.DateTimeField(blank=True, null=True)
 
     USERNAME_FIELD = 'email'
@@ -144,6 +155,7 @@ class User(AbstractUser):
         self.password_reset_token_hash = None
         self.password_reset_expires = None
 
+
 class UserProfile(models.Model):
     """Extended user profile information"""
 
@@ -162,12 +174,15 @@ class UserProfile(models.Model):
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile', primary_key=True)
     bio = models.TextField(blank=True, max_length=500)
-    
+
     # Location fields for geo-based recommendations
     location_name = models.CharField(max_length=100, blank=True, help_text="City, State/Country display name")
     location = models.PointField(geography=True, null=True, blank=True, srid=4326)
-    search_radius_km = models.PositiveIntegerField(default=50, help_text="Default search radius for nearby events in kilometers")
-    
+    search_radius_km = models.PositiveIntegerField(
+        default=50,
+        help_text="Default search radius for nearby events in kilometers"
+    )
+
     timezone = models.CharField(max_length=50, blank=True, default='UTC')
     birth_date = models.DateField(blank=True, null=True)
     phone_number = models.CharField(max_length=20, blank=True)
@@ -175,7 +190,10 @@ class UserProfile(models.Model):
     # Onboarding and preferences
     is_onboarding_completed = models.BooleanField(default=False)
     has_skipped_onboarding = models.BooleanField(default=False)
-    interests = models.ManyToManyField('Interest', blank=True, related_name='users', help_text="User's selected interests for personalization")
+    interests = models.ManyToManyField(
+        'Interest', blank=True, related_name='users',
+        help_text="User's selected interests for personalization"
+    )
 
     # Privacy settings
     is_profile_public = models.BooleanField(default=True)
@@ -183,7 +201,7 @@ class UserProfile(models.Model):
     allow_email_notifications = models.BooleanField(default=True)
     allow_push_notifications = models.BooleanField(default=True)
 
-    #Calendar integration
+    # Calendar integration
     calendar_integrated = models.BooleanField(default=False)
     calendar_provider = models.CharField(
         max_length=30,
@@ -192,7 +210,7 @@ class UserProfile(models.Model):
     )
     calendar_sync_token = models.CharField(max_length=255, blank=True, null=True)
     calendar_last_synced_at = models.DateTimeField(blank=True, null=True)
-    
+
     # Payment and subscription
     payment_plan = models.CharField(
         max_length=20,
@@ -205,14 +223,14 @@ class UserProfile(models.Model):
     # Usage tracking
     last_active_at = models.DateTimeField(null=True, blank=True)
     login_count = models.IntegerField(default=0)
-    
+
     # Preferences
     theme = models.CharField(
         max_length=20,
         choices=(('light', 'Light'), ('dark', 'Dark'), ('auto', 'Auto')),
         default='auto'
     )
-    
+
     # Timestamps
     created_at = models.DateTimeField(default=django_timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
@@ -224,11 +242,17 @@ class UserProfile(models.Model):
 
     def __str__(self):
         return f"{self.user.full_name}'s Profile"
-    
+
     @property
     def is_premium(self):
         """Check if the user has a premium subscription"""
-        return self.payment_plan == 'premium' and (self.subscription_expires_at is None or self.subscription_expires_at > django_timezone.now())
+        return (
+            self.payment_plan == 'premium'
+            and (
+                self.subscription_expires_at is None
+                or self.subscription_expires_at > django_timezone.now()
+            )
+        )
 
     @property
     def has_location(self) -> bool:
@@ -290,7 +314,8 @@ class LoginAttempt(models.Model):
     def __str__(self):
         status = "Success" if self.success else "Failed"
         return f"{status} login attempt for {self.email} at {self.created_at}"
-    
+
+
 class UserSession(models.Model):
     """Track user device sessions for security"""
 
@@ -322,7 +347,10 @@ class RefreshToken(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='refresh_tokens')
-    session = models.ForeignKey(UserSession, on_delete=models.CASCADE, related_name='refresh_tokens', blank=True, null=True)
+    session = models.ForeignKey(
+        UserSession, on_delete=models.CASCADE,
+        related_name='refresh_tokens', blank=True, null=True
+    )
     token = models.CharField(max_length=500, unique=True)
     expires_at = models.DateTimeField()
     is_revoked = models.BooleanField(default=False)
@@ -339,4 +367,3 @@ class RefreshToken(models.Model):
 
     def __str__(self):
         return f"Refresh token for {self.user.email}"
-

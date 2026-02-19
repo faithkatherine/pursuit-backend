@@ -2,6 +2,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.test import Client
 from rest_framework.test import APIClient
+
 from apps.users.authentication import JWTService
 
 User = get_user_model()

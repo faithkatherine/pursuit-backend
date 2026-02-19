@@ -20,5 +20,5 @@ SECURE_CONTENT_TYPE_NOSNIFF = False
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 # JWT: fall back to SECRET_KEY in development if JWT_SECRET_KEY not set
-if not JWT_SECRET_KEY:
-    JWT_SECRET_KEY = SECRET_KEY
+if not JWT_SECRET_KEY:  # noqa: F405
+    JWT_SECRET_KEY = SECRET_KEY  # noqa: F405

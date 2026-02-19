@@ -20,7 +20,7 @@ class Event(models.Model):
 
     def __str__(self):
         return self.name
-    
+
     def clean(self):
         super().clean()
         if self.end_date and self.end_date < self.date:

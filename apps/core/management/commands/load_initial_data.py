@@ -1,4 +1,5 @@
 from django.core.management.base import BaseCommand
+
 from apps.core.models import Category, Emoji
 from apps.users.models import Interest
 
@@ -22,13 +23,20 @@ class Command(BaseCommand):
     def load_categories(self):
         """Create default bucket list categories"""
         categories_data = [
-            {'name': 'Travel', 'emoji': '✈️', 'description': 'Travel destinations and experiences', 'color': '#FF6B6B'},
-            {'name': 'Adventure', 'emoji': '🏔️', 'description': 'Outdoor adventures and extreme activities', 'color': '#4ECDC4'},
-            {'name': 'Food & Drink', 'emoji': '🍜', 'description': 'Culinary experiences and local cuisine', 'color': '#45B7D1'},
-            {'name': 'Culture', 'emoji': '🎭', 'description': 'Cultural events and artistic experiences', 'color': '#96CEB4'},
-            {'name': 'Learning', 'emoji': '📚', 'description': 'Educational experiences and skill building', 'color': '#FECA57'},
-            {'name': 'Sports', 'emoji': '⚽', 'description': 'Sports activities and events', 'color': '#FF9FF3'},
-            {'name': 'Music & Events', 'emoji': '🎵', 'description': 'Concerts, festivals, and live events', 'color': '#54A0FF'},
+            {'name': 'Travel', 'emoji': '✈️',
+             'description': 'Travel destinations and experiences', 'color': '#FF6B6B'},
+            {'name': 'Adventure', 'emoji': '🏔️',
+             'description': 'Outdoor adventures and extreme activities', 'color': '#4ECDC4'},
+            {'name': 'Food & Drink', 'emoji': '🍜',
+             'description': 'Culinary experiences and local cuisine', 'color': '#45B7D1'},
+            {'name': 'Culture', 'emoji': '🎭',
+             'description': 'Cultural events and artistic experiences', 'color': '#96CEB4'},
+            {'name': 'Learning', 'emoji': '📚',
+             'description': 'Educational experiences and skill building', 'color': '#FECA57'},
+            {'name': 'Sports', 'emoji': '⚽',
+             'description': 'Sports activities and events', 'color': '#FF9FF3'},
+            {'name': 'Music & Events', 'emoji': '🎵',
+             'description': 'Concerts, festivals, and live events', 'color': '#54A0FF'},
             {'name': 'Nature', 'emoji': '🌿', 'description': 'Nature experiences and wildlife', 'color': '#5F27CD'},
         ]
 

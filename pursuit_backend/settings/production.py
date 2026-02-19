@@ -42,7 +42,7 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 # Database — prefer DATABASE_URL (provided by Render) over individual vars
 _db_url = os.environ.get('DATABASE_URL')
 if _db_url:
-    DATABASES['default'] = dj_database_url.config(
+    DATABASES['default'] = dj_database_url.config(  # noqa: F405
         default=_db_url,
         engine='django.contrib.gis.db.backends.postgis',
     )
@@ -59,13 +59,13 @@ STORAGES = {
 # ---------------------------------------------------------------------------
 _errors = []
 
-if SECRET_KEY == 'django-insecure-change-me-in-production':
+if SECRET_KEY == 'django-insecure-change-me-in-production':  # noqa: F405
     _errors.append(
         "SECRET_KEY is still the insecure default. "
         "Set a strong SECRET_KEY env var for production."
     )
 
-if not JWT_SECRET_KEY:
+if not JWT_SECRET_KEY:  # noqa: F405
     _errors.append(
         "JWT_SECRET_KEY must be set in production. "
         'Generate one with: python -c "import secrets; print(secrets.token_hex(32))"'

@@ -1,6 +1,7 @@
 from django.contrib.auth.models import AnonymousUser
 from graphql import GraphQLError
 from rest_framework.exceptions import AuthenticationFailed
+
 from .authentication import JWTAuthentication
 
 

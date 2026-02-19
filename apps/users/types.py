@@ -1,11 +1,15 @@
 import graphene
 from graphene_django import DjangoObjectType
-from apps.users.models import User as UserModel, UserProfile as UserProfileModel, Interest as InterestModel, UserSession as UserSessionModel
 
+from apps.users.models import Interest as InterestModel
+from apps.users.models import User as UserModel
+from apps.users.models import UserProfile as UserProfileModel
+from apps.users.models import UserSession as UserSessionModel
 
 # =============================================================================
 # GraphQL Types (Alphabetical Order)
 # =============================================================================
+
 
 class AuthPayloadType(graphene.ObjectType):
     """Standard auth response"""
