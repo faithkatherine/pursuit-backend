@@ -6,6 +6,8 @@ Production-like but with staging-specific configuration.
 
 import os
 
+import dj_database_url
+
 from .base import *  # noqa: F401,F403
 
 DEBUG = False
@@ -26,6 +28,15 @@ CORS_ALLOWED_ORIGINS = [
 # Security
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# Database — prefer DATABASE_URL (provided by Render) over individual vars
+_db_url = os.environ.get('DATABASE_URL')
+if _db_url:
+    DATABASES['default'] = dj_database_url.config(
+        default=_db_url,
+        engine='django.contrib.gis.db.backends.postgis',
+    )
 
 # Static files served by WhiteNoise
 STORAGES = {

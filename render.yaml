@@ -1,0 +1,64 @@
+# Render Blueprint — Infrastructure as Code
+# https://render.com/docs/blueprint-spec
+
+services:
+  # ── Staging ──────────────────────────────────────────────────────────
+  - type: web
+    name: pursuit-backend-staging
+    runtime: docker
+    repo: https://github.com/faithkatherine/pursuit-backend
+    branch: main
+    autoDeploy: true
+    plan: free
+    healthCheckPath: /api/health/
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: pursuit_backend.settings.staging
+      - key: DATABASE_URL
+        fromDatabase:
+          name: pursuit-db-staging
+          property: connectionURI
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: ALLOWED_HOSTS
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+
+  # ── Production ───────────────────────────────────────────────────────
+  - type: web
+    name: pursuit-backend-prod
+    runtime: docker
+    repo: https://github.com/faithkatherine/pursuit-backend
+    branch: main
+    autoDeploy: false          # manual deploy only
+    plan: free
+    healthCheckPath: /api/health/
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: pursuit_backend.settings.production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: pursuit-db-prod
+          property: connectionURI
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: ALLOWED_HOSTS
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+
+databases:
+  - name: pursuit-db-staging
+    plan: free
+    postgresMajorVersion: "17"
+    ipAllowList: []            # only internal connections
+
+  - name: pursuit-db-prod
+    plan: free
+    postgresMajorVersion: "17"
+    ipAllowList: []            # only internal connections

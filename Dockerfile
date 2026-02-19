@@ -38,10 +38,16 @@ RUN echo '#!/bin/bash\n\
 set -e\n\
 \n\
 # Wait for database\n\
-echo "Waiting for database..."\n\
-while ! pg_isready -h $DB_HOST -p $DB_PORT -U $DB_USER; do\n\
-  sleep 1\n\
-done\n\
+if [ -n "$DATABASE_URL" ]; then\n\
+  echo "Using DATABASE_URL — managed database, skipping pg_isready."\n\
+else\n\
+  _db_host=${DB_HOST:-localhost}\n\
+  _db_port=${DB_PORT:-5432}\n\
+  echo "Waiting for database at $_db_host:$_db_port..."\n\
+  while ! pg_isready -h "$_db_host" -p "$_db_port" -q 2>/dev/null; do\n\
+    sleep 1\n\
+  done\n\
+fi\n\
 \n\
 # Run migrations\n\
 echo "Running migrations..."\n\
