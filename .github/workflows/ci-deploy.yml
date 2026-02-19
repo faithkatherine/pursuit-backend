@@ -1,0 +1,177 @@
+name: CI & Deploy
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  DJANGO_SETTINGS_MODULE: pursuit_backend.test_settings
+  SECRET_KEY: ci-test-secret-key-not-for-production
+  DB_NAME: pursuit_db
+  DB_USER: pursuit_user
+  DB_PASSWORD: pursuit_password
+  DB_HOST: localhost
+  DB_PORT: 5432
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run flake8
+        run: flake8 --max-line-length=120 --exclude=venv,migrations .
+
+      - name: Check import ordering
+        run: isort --check-only --diff --skip venv --skip migrations .
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgis/postgis:17-3.4
+        env:
+          POSTGRES_DB: pursuit_db
+          POSTGRES_USER: pursuit_user
+          POSTGRES_PASSWORD: pursuit_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gdal-bin libgdal-dev
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Django checks
+        run: python manage.py check
+
+      - name: Run tests
+        run: pytest --cov=apps --cov-report=term-missing
+
+  check-production-validation:
+    name: Production settings validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gdal-bin libgdal-dev
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Verify production settings fail without secrets
+        run: |
+          if DJANGO_SETTINGS_MODULE=pursuit_backend.settings.production python manage.py check 2>&1; then
+            echo "ERROR: Production settings should have failed without secrets!"
+            exit 1
+          else
+            echo "Production settings correctly rejected missing secrets."
+          fi
+
+  # ── Deploy: Staging ──────────────────────────────────────────────────
+  deploy-staging:
+    name: Deploy to Staging
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: staging
+
+    steps:
+      - name: Trigger Render deploy
+        run: |
+          curl -sSf "${{ secrets.RENDER_STAGING_DEPLOY_HOOK }}" \
+            || { echo "Deploy hook failed"; exit 1; }
+
+      - name: Wait for deployment
+        run: sleep 60
+
+      - name: Health check
+        run: |
+          for i in 1 2 3 4 5; do
+            status=$(curl -sSf "${{ secrets.RENDER_STAGING_URL }}/api/health/" \
+                     -o /dev/null -w '%{http_code}' || true)
+            if [ "$status" = "200" ]; then
+              echo "Staging health check passed."
+              exit 0
+            fi
+            echo "Attempt $i: status=$status — retrying in 15s…"
+            sleep 15
+          done
+          echo "Staging health check failed after 5 attempts."
+          exit 1
+
+  # ── Deploy: Production ───────────────────────────────────────────────
+  deploy-production:
+    name: Deploy to Production
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    if: >
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
+      || github.event_name == 'workflow_dispatch'
+    environment: production
+
+    steps:
+      - name: Trigger Render deploy
+        run: |
+          curl -sSf "${{ secrets.RENDER_PRODUCTION_DEPLOY_HOOK }}" \
+            || { echo "Deploy hook failed"; exit 1; }
+
+      - name: Wait for deployment
+        run: sleep 60
+
+      - name: Health check
+        run: |
+          for i in 1 2 3 4 5; do
+            status=$(curl -sSf "${{ secrets.RENDER_PRODUCTION_URL }}/api/health/" \
+                     -o /dev/null -w '%{http_code}' || true)
+            if [ "$status" = "200" ]; then
+              echo "Production health check passed."
+              exit 0
+            fi
+            echo "Attempt $i: status=$status — retrying in 15s…"
+            sleep 15
+          done
+          echo "Production health check failed after 5 attempts."
+          exit 1

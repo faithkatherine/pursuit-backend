@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   db:
-    image: postgres:15
+    image: kartoza/postgis:17-3.5
     environment:
       POSTGRES_DB: pursuit_db
       POSTGRES_USER: pursuit_user
@@ -31,10 +31,11 @@ services:
 
   web:
     build: .
+    entrypoint: []
     ports:
       - "8000:8000"
     environment:
-      - DEBUG=True
+      - DJANGO_SETTINGS_MODULE=pursuit_backend.settings.development
       - DB_NAME=pursuit_db
       - DB_USER=pursuit_user
       - DB_PASSWORD=pursuit_password
@@ -55,9 +56,10 @@ services:
 
   celery:
     build: .
+    entrypoint: []
     command: celery -A pursuit_backend worker -l info
     environment:
-      - DEBUG=True
+      - DJANGO_SETTINGS_MODULE=pursuit_backend.settings.development
       - DB_NAME=pursuit_db
       - DB_USER=pursuit_user
       - DB_PASSWORD=pursuit_password
@@ -76,9 +78,10 @@ services:
 
   celery-beat:
     build: .
+    entrypoint: []
     command: celery -A pursuit_backend beat -l info
     environment:
-      - DEBUG=True
+      - DJANGO_SETTINGS_MODULE=pursuit_backend.settings.development
       - DB_NAME=pursuit_db
       - DB_USER=pursuit_user
       - DB_PASSWORD=pursuit_password
