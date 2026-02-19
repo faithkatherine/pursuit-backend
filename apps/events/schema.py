@@ -11,4 +11,4 @@ class EventsQueries(graphene.ObjectType):
     def resolve_events(self, info, offset=0, limit=10):
         offset = max(0, offset)
         limit = max(1, min(limit, MAX_LIMIT))
-        return Event.objects.all()[offset:offset + limit]
+        return Event.objects.filter(is_active=True)[offset:offset + limit]
