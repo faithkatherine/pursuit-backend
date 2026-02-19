@@ -47,12 +47,7 @@ if _db_url:
         engine='django.contrib.gis.db.backends.postgis',
     )
 
-# Static files served by WhiteNoise
-STORAGES = {
-    "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
-    },
-}
+# Static files served by WhiteNoise (configured in base settings)
 
 # ---------------------------------------------------------------------------
 # Startup validation: fail fast if required secrets are missing

@@ -31,7 +31,7 @@ RUN mkdir -p logs
 
 # Collect static files (for production)
 RUN DJANGO_SETTINGS_MODULE=pursuit_backend.settings.development \
-    python manage.py collectstatic --noinput || true
+    python manage.py collectstatic --noinput
 
 # Create entrypoint script
 RUN echo '#!/bin/bash\n\
