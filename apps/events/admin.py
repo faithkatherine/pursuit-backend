@@ -1,4 +1,6 @@
+from django.contrib import messages
 from django.contrib.gis import admin
+from django.db import DatabaseError
 from .models import  Event
 
 # Register your models here.
@@ -19,13 +21,19 @@ class EventAdmin(admin.GISModelAdmin):
 
     @admin.action(description='Deactivate selected events')
     def deactivate_events(self, request, queryset):
-        count = queryset.update(is_active=False)
-        self.message_user(request, f'{count} event(s) deactivated.')
+        try:
+            count = queryset.update(is_active=False)
+            self.message_user(request, f'{count} event(s) deactivated.')
+        except DatabaseError as e:
+            self.message_user(request, f'Error deactivating events: {e}', level=messages.ERROR)
 
     @admin.action(description='Activate selected events')
     def activate_events(self, request, queryset):
-        count = queryset.update(is_active=True)
-        self.message_user(request, f'{count} event(s) activated.')
+        try:
+            count = queryset.update(is_active=True)
+            self.message_user(request, f'{count} event(s) activated.')
+        except DatabaseError as e:
+            self.message_user(request, f'Error activating events: {e}', level=messages.ERROR)
 
     class Media:
         js = ('events/js/geocode_location.js',)
