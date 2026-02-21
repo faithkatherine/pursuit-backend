@@ -19,7 +19,7 @@ class Category(TimeStampedModel):
     """Category model for organizing bucket items"""
 
     name = models.CharField(max_length=100, unique=True)
-    emoji = models.CharField(max_length=10, blank=True)
+    icon = models.CharField(max_length=10, blank=True)
     description = models.TextField(blank=True)
     color = models.CharField(max_length=7, default='#007AFF')  # Hex color
     is_active = models.BooleanField(default=True)
@@ -37,29 +37,8 @@ class Category(TimeStampedModel):
         ]
 
     def __str__(self):
-        return f"{self.emoji} {self.name}" if self.emoji else self.name
+        return f"{self.icon} {self.name}" if self.icon else self.name
 
-
-class Emoji(models.Model):
-    """Emoji library for categories and items"""
-
-    symbol = models.CharField(max_length=10, unique=True)
-    description = models.CharField(max_length=100)
-    category = models.CharField(max_length=50, blank=True)  # e.g., 'travel', 'food', 'activities'
-    unicode_value = models.CharField(max_length=20)
-
-    class Meta:
-        db_table = 'core_emoji'
-        verbose_name = 'Emoji'
-        verbose_name_plural = 'Emojis'
-        ordering = ['category', 'description']
-        indexes = [
-            models.Index(fields=['category']),
-            models.Index(fields=['symbol']),
-        ]
-
-    def __str__(self):
-        return f"{self.symbol} - {self.description}"
 
 
 class Interest(models.Model):

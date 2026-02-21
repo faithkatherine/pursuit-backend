@@ -14,7 +14,7 @@ class EventType(DjangoObjectType):
         fields = (
             'id', 'name', 'description', 'category', 'date', 'end_date',
             'image', 'timezone', 'location_name', 'more_details_url',
-            'created_at', 'updated_at',
+            'created_at', 'updated_at', 'is_active',
         )
 
     def resolve_coordinates(self, info):

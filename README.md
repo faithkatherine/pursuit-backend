@@ -5,7 +5,6 @@ A comprehensive Django backend with GraphQL API for the Pursuit mobile applicati
 ## Features
 
 - **Authentication & Authorization**
-
   - JWT-based authentication
   - Google OAuth2 integration
   - Username/password authentication
@@ -13,7 +12,6 @@ A comprehensive Django backend with GraphQL API for the Pursuit mobile applicati
   - Onboarding flow
 
 - **Bucket List Management**
-
   - Create and organize bucket lists
   - Categorized bucket items
   - Progress tracking
@@ -21,14 +19,12 @@ A comprehensive Django backend with GraphQL API for the Pursuit mobile applicati
   - Location-based items
 
 - **Travel Recommendations**
-
   - Personalized recommendations
   - Location-based suggestions
   - Category filtering
   - User interaction tracking
 
 - **Insights & Analytics**
-
   - User progress insights
   - Travel statistics
   - Weather integration
@@ -147,7 +143,6 @@ EMAIL_HOST_PASSWORD=your-app-password
 ### REST API
 
 - **Authentication**
-
   - `POST /api/auth/signup/` - User registration
   - `POST /api/auth/signin/` - User login
   - `POST /api/auth/google-signin/` - Google OAuth login
@@ -155,7 +150,6 @@ EMAIL_HOST_PASSWORD=your-app-password
   - `POST /api/auth/signout/` - User logout
 
 - **Buckets**
-
   - `GET /api/buckets/items/` - List bucket items
   - `POST /api/buckets/items/` - Create bucket item
   - `PUT /api/buckets/items/{id}/` - Update bucket item
@@ -257,7 +251,6 @@ mutation {
 - **User** - Custom user model with profile fields
 - **UserProfile** - Extended user information
 - **Category** - Bucket item categories
-- **Emoji** - Emoji library for categories
 
 ### Bucket Models
 

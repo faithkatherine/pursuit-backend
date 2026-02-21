@@ -1,0 +1,29 @@
+# GraphQL Types for Events
+
+"""
+An event with location, date, and category information
+"""
+type Event {
+  id: ID!
+  name: String!
+  description: String
+  category: [Category!]
+  date: DateTime!
+  endDate: DateTime
+  image: String
+  timezone: String
+  locationName: String
+  coordinates: [Float]
+  moreDetailsUrl: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  isActive: Boolean!
+}
+
+"""
+Response payload for event list queries
+"""
+type EventsListPayload {
+  ok: Boolean!
+  events: [Event!]!
+}

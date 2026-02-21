@@ -32,21 +32,21 @@ class Command(BaseCommand):
 
         # Create categories
         categories_data = [
-            {"name": "Movies", "emoji": "🎬"},
-            {"name": "Books", "emoji": "📚"},
-            {"name": "Cooking", "emoji": "🍳"},
-            {"name": "Travelling", "emoji": "✈️"},
-            {"name": "Fitness", "emoji": "⚽"},
-            {"name": "Creativity", "emoji": "🎨"},
-            {"name": "Music", "emoji": "🎵"},
-            {"name": "Nature", "emoji": "🌿"},
+            {"name": "Movies", "icon": "🎬"},
+            {"name": "Books", "icon": "📚"},
+            {"name": "Cooking", "icon": "🍳"},
+            {"name": "Travelling", "icon": "✈️"},
+            {"name": "Fitness", "icon": "⚽"},
+            {"name": "Creativity", "icon": "🎨"},
+            {"name": "Music", "icon": "🎵"},
+            {"name": "Nature", "icon": "🌿"},
         ]
 
         categories = {}
         for cat_data in categories_data:
             cat, created = Category.objects.get_or_create(
                 name=cat_data["name"],
-                defaults={"emoji": cat_data["emoji"], "is_active": True}
+                defaults={"icon": cat_data["icon"], "is_active": True}
             )
             categories[cat_data["name"]] = cat
             if created:

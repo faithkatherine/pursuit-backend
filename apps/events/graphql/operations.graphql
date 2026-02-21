@@ -1,0 +1,96 @@
+"""
+Copy-paste ready client operations for Events
+"""
+
+# ─── QUERIES ──────────────────────────────────────────────
+
+"""
+Get all events (with default pagination: offset=0, limit=20)
+"""
+query GetEvents {
+  getEvents {
+    ok
+    events {
+      id
+      name
+      description
+      category {
+        id
+        name
+        icon
+      }
+      date
+      endDate
+      image
+      timezone
+      locationName
+      coordinates
+      moreDetailsUrl
+      isActive
+    }
+  }
+}
+
+"""
+Get events with pagination
+"""
+query GetEventsWithPagination($offset: Int, $limit: Int, $category: String) {
+  getEvents(offset: $offset, limit: $limit, category: $category) {
+    ok
+    events {
+      id
+      name
+      description
+      category {
+        id
+        name
+        icon
+      }
+      date
+      endDate
+      image
+      timezone
+      locationName
+      coordinates
+      moreDetailsUrl
+      isActive
+    }
+  }
+}
+
+"""
+Get events - minimal fields (for list/card views)
+"""
+query GetEventsMinimal($offset: Int, $limit: Int) {
+  getEvents(offset: $offset, limit: $limit) {
+    ok
+    events {
+      id
+      name
+      image
+      date
+      locationName
+      category {
+        name
+        icon
+      }
+    }
+  }
+}
+
+"""
+Get events - with location data (for map views)
+"""
+query GetEventsForMap($offset: Int, $limit: Int) {
+  getEvents(offset: $offset, limit: $limit) {
+    ok
+    events {
+      id
+      name
+      date
+      locationName
+      coordinates
+      image
+    }
+  }
+}

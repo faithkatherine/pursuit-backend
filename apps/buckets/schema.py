@@ -2,16 +2,10 @@ import graphene
 from graphene_django import DjangoObjectType
 
 from apps.core.models import Category
+from apps.core.types import CategoryType
 
 from .models import BucketItem, BucketList
 
-
-class CategoryType(DjangoObjectType):
-    """GraphQL Category type"""
-
-    class Meta:
-        model = Category
-        fields = ['id', 'name', 'emoji', 'description', 'color']
 
 
 class BucketItemType(DjangoObjectType):

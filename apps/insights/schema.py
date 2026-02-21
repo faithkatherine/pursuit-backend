@@ -49,7 +49,7 @@ class HomeDataType(graphene.ObjectType):
     time_of_day = graphene.String()
     weather = graphene.Field(WeatherType)
     insights = graphene.Field(InsightsDataType)
-    bucket_categories = graphene.List('apps.buckets.schema.CategoryType')
+    bucket_categories = graphene.List('apps.core.schema.CategoryType')
     recommendations = graphene.List('apps.recommendations.schema.RecommendationType')
     upcoming = graphene.List('apps.buckets.schema.BucketItemType')
 

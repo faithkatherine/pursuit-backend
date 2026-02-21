@@ -4,7 +4,7 @@ from .models import Category, Interest
 
 
 class CategoryAdmin(admin.ModelAdmin):
-    list_display = ('name', 'description', 'emoji')
+    list_display = ('name', 'description', 'icon')
     search_fields = ('name',)
 
 

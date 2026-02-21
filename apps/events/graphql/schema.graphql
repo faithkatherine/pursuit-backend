@@ -1,0 +1,8 @@
+# Event Queries
+
+type Query {
+  """
+  Get a paginated list of active events
+  """
+  getEvents(offset: Int, limit: Int, category: String): EventsListPayload!
+}

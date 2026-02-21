@@ -1,18 +1,18 @@
 from django.core.management.base import BaseCommand
 
-from apps.core.models import Category, Emoji, Interest
+from apps.core.models import Category, icon, Interest
 
 
 class Command(BaseCommand):
     """Load initial data for the application"""
 
-    help = 'Load initial data including categories, emojis, and interests'
+    help = 'Load initial data including categories, icons, and interests'
 
     def handle(self, *args, **options):
         self.stdout.write('Loading initial data...')
 
         self.load_categories()
-        self.load_emojis()
+        self.load_icons()
         self.load_interests()
 
         self.stdout.write(
@@ -22,28 +22,28 @@ class Command(BaseCommand):
     def load_categories(self):
         """Create default bucket list categories"""
         categories_data = [
-            {'name': 'Travel', 'emoji': '✈️',
+            {'name': 'Travel', 'icon': '✈️',
              'description': 'Travel destinations and experiences', 'color': '#FF6B6B'},
-            {'name': 'Adventure', 'emoji': '🏔️',
+            {'name': 'Adventure', 'icon': '🏔️',
              'description': 'Outdoor adventures and extreme activities', 'color': '#4ECDC4'},
-            {'name': 'Food & Drink', 'emoji': '🍜',
+            {'name': 'Food & Drink', 'icon': '🍜',
              'description': 'Culinary experiences and local cuisine', 'color': '#45B7D1'},
-            {'name': 'Culture', 'emoji': '🎭',
+            {'name': 'Culture', 'icon': '🎭',
              'description': 'Cultural events and artistic experiences', 'color': '#96CEB4'},
-            {'name': 'Learning', 'emoji': '📚',
+            {'name': 'Learning', 'icon': '📚',
              'description': 'Educational experiences and skill building', 'color': '#FECA57'},
-            {'name': 'Sports', 'emoji': '⚽',
+            {'name': 'Sports', 'icon': '⚽',
              'description': 'Sports activities and events', 'color': '#FF9FF3'},
-            {'name': 'Music & Events', 'emoji': '🎵',
+            {'name': 'Music & Events', 'icon': '🎵',
              'description': 'Concerts, festivals, and live events', 'color': '#54A0FF'},
-            {'name': 'Nature', 'emoji': '🌿', 'description': 'Nature experiences and wildlife', 'color': '#5F27CD'},
+            {'name': 'Nature', 'icon': '🌿', 'description': 'Nature experiences and wildlife', 'color': '#5F27CD'},
         ]
 
         for i, cat_data in enumerate(categories_data):
             category, created = Category.objects.get_or_create(
                 name=cat_data['name'],
                 defaults={
-                    'emoji': cat_data['emoji'],
+                    'icon': cat_data['icon'],
                     'description': cat_data['description'],
                     'color': cat_data['color'],
                     'sort_order': i
@@ -52,9 +52,9 @@ class Command(BaseCommand):
             if created:
                 self.stdout.write(f'Created category: {category.name}')
 
-    def load_emojis(self):
-        """Create emoji library"""
-        emojis_data = [
+    def load_icons(self):
+        """Create icon library"""
+        icons_data = [
             ('✈️', 'Airplane', 'travel'),
             ('🏔️', 'Mountain', 'adventure'),
             ('🍜', 'Noodles', 'food'),
@@ -77,10 +77,10 @@ class Command(BaseCommand):
             ('🍷', 'Wine Glass', 'food'),
         ]
 
-        for symbol, description, category in emojis_data:
-            # Handle multi-character emoji sequences
+        for symbol, description, category in icons_data:
+            # Handle multi-character icon sequences
             unicode_value = ' '.join(f'U+{ord(char):04X}' for char in symbol)
-            emoji, created = Emoji.objects.get_or_create(
+            icon, created = icon.objects.get_or_create(
                 symbol=symbol,
                 defaults={
                     'description': description,
@@ -89,7 +89,7 @@ class Command(BaseCommand):
                 }
             )
             if created:
-                self.stdout.write(f'Created emoji: {emoji.symbol} - {emoji.description}')
+                self.stdout.write(f'Created icon: {icon.symbol} - {icon.description}')
 
     def load_interests(self):
         """Create user interests for personalization, linked to categories"""
