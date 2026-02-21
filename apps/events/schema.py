@@ -1,5 +1,6 @@
 import graphene
 from django.core.cache import cache
+from graphql import GraphQLError
 
 from .models import Event
 from .signals import EVENTS_CACHE_VERSION_KEY
@@ -22,12 +23,21 @@ class EventsListPayload(graphene.ObjectType):
     events = graphene.List(graphene.NonNull(EventType), required=True)
 
 
+class EventPayload(graphene.ObjectType):
+    ok = graphene.Boolean(required=True)
+    event = graphene.Field(EventType)
+
+
 class EventsQueries(graphene.ObjectType):
     get_events = graphene.Field(
         EventsListPayload,
         category=graphene.String(),
         offset=graphene.Int(),
         limit=graphene.Int(),
+    )
+    get_event = graphene.Field(
+        EventPayload,
+        id=graphene.ID(required=True),
     )
 
     def resolve_get_events(self, info, category=None, offset=0, limit=20):
@@ -52,3 +62,14 @@ class EventsQueries(graphene.ObjectType):
             events.sort(key=lambda e: id_order[e.pk])
 
         return EventsListPayload(ok=True, events=events)
+
+    def resolve_get_event(self, info, id):
+        try:
+            event = Event.objects.prefetch_related("category").get(pk=id)
+        except Event.DoesNotExist:
+            raise GraphQLError("Event not found.")
+
+        if not event.is_active:
+            raise GraphQLError("Event not found.")
+
+        return EventPayload(ok=True, event=event)

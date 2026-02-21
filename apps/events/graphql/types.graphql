@@ -27,3 +27,11 @@ type EventsListPayload {
   ok: Boolean!
   events: [Event!]!
 }
+
+"""
+Response payload for single event query
+"""
+type EventPayload {
+  ok: Boolean!
+  event: Event
+}

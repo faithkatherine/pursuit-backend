@@ -7,6 +7,8 @@ type Query {
   getInsightsData: InsightsDataType
   getHome(offset: Int, limit: Int): HomeDataType
   getRecommendations(offset: Int, limit: Int): [RecommendationType]
+  getEvents(offset: Int, limit: Int, category: String): [EventType]
+  getEvent(id: ID!): EventPayload!
   getBucketCategories: [CategoryType]
   getBucketItems(categoryId: String): [BucketItemType]
 
