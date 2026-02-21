@@ -1,7 +1,12 @@
 import graphene
+from django.core.cache import cache
 
 from .models import Category, Interest
 from .types import CategoryType, InterestType
+
+CATEGORIES_CACHE_KEY = "core:categories"
+INTERESTS_CACHE_KEY = "core:interests"
+CORE_CACHE_TTL = 900  # 15 minutes
 
 
 class CategoryListPayload(graphene.ObjectType):
@@ -19,13 +24,15 @@ class CoreQueries(graphene.ObjectType):
     get_interests = graphene.Field(InterestListPayload, required=True)
 
     def resolve_get_categories(self, info):
-        return CategoryListPayload(
-            ok=True,
-            categories=Category.objects.all(),
-        )
+        categories = cache.get(CATEGORIES_CACHE_KEY)
+        if categories is None:
+            categories = list(Category.objects.all())
+            cache.set(CATEGORIES_CACHE_KEY, categories, CORE_CACHE_TTL)
+        return CategoryListPayload(ok=True, categories=categories)
 
     def resolve_get_interests(self, info):
-        return InterestListPayload(
-            ok=True,
-            interests=Interest.objects.all(),
-        )
+        interests = cache.get(INTERESTS_CACHE_KEY)
+        if interests is None:
+            interests = list(Interest.objects.select_related("category").all())
+            cache.set(INTERESTS_CACHE_KEY, interests, CORE_CACHE_TTL)
+        return InterestListPayload(ok=True, interests=interests)

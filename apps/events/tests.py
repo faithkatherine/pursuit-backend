@@ -265,3 +265,106 @@ class TestGetEventsQuery:
         assert "locationName" in event
         assert "coordinates" in event
         assert "category" in event
+
+
+# ─── CACHE TESTS ────────────────────────────────────────
+
+LOCMEM_CACHE = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("_clear_cache")
+class TestEventsCache:
+    @pytest.fixture(autouse=True)
+    def _clear_cache(self, settings):
+        settings.CACHES = LOCMEM_CACHE
+        from django.core.cache import cache
+
+        cache.clear()
+
+    def test_cache_miss_then_hit(self, client, active_event):
+        from django.core.cache import cache
+
+        from apps.events.schema import _get_events_cache_version
+
+        version = _get_events_cache_version()
+        cache_key = f"events:v{version}:all:0:20"
+
+        # First request — cache miss
+        assert cache.get(cache_key) is None
+        response = client.post(
+            "/graphql/",
+            json.dumps({"query": GET_EVENTS_QUERY}),
+            content_type="application/json",
+        )
+        assert response.json()["data"]["getEvents"]["ok"] is True
+
+        # Cache is now populated
+        cached = cache.get(cache_key)
+        assert cached is not None
+        assert len(cached) == 1
+
+    def test_cache_invalidated_on_event_save(self, active_event):
+        from django.core.cache import cache
+
+        from apps.events.signals import EVENTS_CACHE_VERSION_KEY
+
+        cache.set(EVENTS_CACHE_VERSION_KEY, 1)
+        v_before = cache.get(EVENTS_CACHE_VERSION_KEY)
+
+        active_event.name = "Updated Name"
+        active_event.save()
+
+        v_after = cache.get(EVENTS_CACHE_VERSION_KEY)
+        assert v_after == v_before + 1
+
+    def test_cache_invalidated_on_event_delete(self, active_event):
+        from django.core.cache import cache
+
+        from apps.events.signals import EVENTS_CACHE_VERSION_KEY
+
+        cache.set(EVENTS_CACHE_VERSION_KEY, 1)
+
+        active_event.delete()
+
+        v_after = cache.get(EVENTS_CACHE_VERSION_KEY)
+        assert v_after == 2
+
+    def test_cached_response_matches_fresh_response(self, client, active_event):
+        query = json.dumps({"query": GET_EVENTS_QUERY})
+
+        # First call — cache miss
+        resp1 = client.post("/graphql/", query, content_type="application/json")
+        # Second call — cache hit
+        resp2 = client.post("/graphql/", query, content_type="application/json")
+
+        events1 = resp1.json()["data"]["getEvents"]["events"]
+        events2 = resp2.json()["data"]["getEvents"]["events"]
+        assert [e["id"] for e in events1] == [e["id"] for e in events2]
+
+    def test_category_filter_uses_separate_cache_key(self, client, active_event, future_event):
+        from django.core.cache import cache
+
+        from apps.events.schema import _get_events_cache_version
+
+        # Fetch all
+        client.post(
+            "/graphql/",
+            json.dumps({"query": GET_EVENTS_QUERY}),
+            content_type="application/json",
+        )
+        # Fetch filtered
+        client.post(
+            "/graphql/",
+            json.dumps({"query": GET_EVENTS_QUERY, "variables": {"category": "Music"}}),
+            content_type="application/json",
+        )
+
+        version = _get_events_cache_version()
+        all_cached = cache.get(f"events:v{version}:all:0:20")
+        music_cached = cache.get(f"events:v{version}:Music:0:20")
+
+        assert all_cached is not None
+        assert music_cached is not None
+        assert len(all_cached) == 2
+        assert len(music_cached) == 1
