@@ -11,8 +11,9 @@ from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
 from graphql import GraphQLError
 
+from apps.core.models import Interest
 from apps.users.authentication import JWTService
-from apps.users.models import Interest, RefreshToken
+from apps.users.models import RefreshToken
 from apps.users.models import User as UserModel
 from apps.users.models import UserSession as UserSessionModel
 from apps.users.types import AuthPayloadType, UserProfileType, UserType

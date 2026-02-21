@@ -191,7 +191,7 @@ class UserProfile(models.Model):
     is_onboarding_completed = models.BooleanField(default=False)
     has_skipped_onboarding = models.BooleanField(default=False)
     interests = models.ManyToManyField(
-        'Interest', blank=True, related_name='users',
+        'core.Interest', blank=True, related_name='users',
         help_text="User's selected interests for personalization"
     )
 
@@ -269,27 +269,6 @@ class UserProfile(models.Model):
     def set_coordinates(self, latitude: float, longitude: float):
         """Set the user's home coordinates"""
         self.location = Point(longitude, latitude)
-
-
-class Interest(models.Model):
-    """List of interests for personalization"""
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=100, unique=True, blank=False, null=False)
-    description = models.TextField(blank=True)
-    icon = models.CharField(max_length=50, blank=True, null=True)
-
-    class Meta:
-        db_table = 'users_interests'
-        verbose_name = _('Interest')
-        verbose_name_plural = _('Interests')
-        ordering = ['name']
-        indexes = [
-            models.Index(fields=['name']),
-        ]
-
-    def __str__(self):
-        return self.name
 
 
 class LoginAttempt(models.Model):

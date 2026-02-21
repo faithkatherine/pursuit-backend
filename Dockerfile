@@ -59,6 +59,12 @@ python manage.py load_initial_data\n\
 # Create superuser from env vars (if set)\n\
 python manage.py create_superuser_from_env\n\
 \n\
+# Seed events (only if SEED_EVENTS is set)\n\
+if [ "$SEED_EVENTS" = "true" ]; then\n\
+  echo "Seeding events..."\n\
+  python manage.py seed_events\n\
+fi\n\
+\n\
 # Start server\n\
 exec "$@"' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 

@@ -1,7 +1,7 @@
 import graphene
 from graphene_django import DjangoObjectType
 
-from apps.users.models import Interest as InterestModel
+from apps.core.models import Interest as InterestModel
 from apps.users.models import User as UserModel
 from apps.users.models import UserProfile as UserProfileModel
 from apps.users.models import UserSession as UserSessionModel
@@ -25,7 +25,7 @@ class InterestType(DjangoObjectType):
 
     class Meta:
         model = InterestModel
-        fields = ('id', 'name', 'description', 'icon')
+        fields = ('id', 'name', 'description', 'icon', 'category')
 
 
 class UserProfileType(DjangoObjectType):

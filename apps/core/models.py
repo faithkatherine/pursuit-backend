@@ -1,6 +1,7 @@
 import uuid
 
 from django.db import models
+from django.utils.translation import gettext_lazy as _
 
 
 class TimeStampedModel(models.Model):
@@ -59,3 +60,28 @@ class Emoji(models.Model):
 
     def __str__(self):
         return f"{self.symbol} - {self.description}"
+
+
+class Interest(models.Model):
+    """Interest model for user personalization, linked to categories"""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=100, unique=True, blank=False, null=False)
+    description = models.TextField(blank=True)
+    icon = models.CharField(max_length=50, blank=True, null=True)
+    category = models.ForeignKey(
+        Category, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='interests',
+    )
+
+    class Meta:
+        db_table = 'users_interests'
+        verbose_name = _('Interest')
+        verbose_name_plural = _('Interests')
+        ordering = ['name']
+        indexes = [
+            models.Index(fields=['name']),
+        ]
+
+    def __str__(self):
+        return self.name

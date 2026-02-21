@@ -2,8 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.translation import gettext_lazy as _
 
-from .models import (Interest, LoginAttempt, RefreshToken, User, UserProfile,
-                     UserSession)
+from .models import LoginAttempt, RefreshToken, User, UserProfile, UserSession
 
 
 @admin.register(User)
@@ -122,19 +121,6 @@ class RefreshTokenAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return False
-
-
-@admin.register(Interest)
-class InterestAdmin(admin.ModelAdmin):
-    """Interest admin for managing available interests"""
-
-    list_display = ['name', 'description', 'icon', 'user_count']
-    search_fields = ['name', 'description']
-    ordering = ['name']
-
-    def user_count(self, obj):
-        return obj.users.count()
-    user_count.short_description = 'Users'
 
 
 @admin.register(UserSession)
