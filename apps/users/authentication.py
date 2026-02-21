@@ -1,10 +1,12 @@
-import jwt
 from datetime import timedelta
+
+import jwt
 from django.conf import settings
 from django.utils import timezone
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
-from .models import User, RefreshToken
+
+from .models import RefreshToken, User
 
 
 class JWTAuthentication(BaseAuthentication):
@@ -65,7 +67,7 @@ class JWTService:
         }
 
         token = jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
-        
+
         # NOTE: RefreshToken DB record is created by the caller (schema.py mutations)
         # This avoids duplicate creation and allows caller to link session
         return token
@@ -90,7 +92,7 @@ class JWTService:
         """Generate new access token from refresh token"""
         try:
             # Verify refresh token
-            payload = JWTService.verify_token(refresh_token, 'refresh')
+            JWTService.verify_token(refresh_token, 'refresh')
 
             # Check if refresh token exists in database and is not revoked
             db_token = RefreshToken.objects.get(

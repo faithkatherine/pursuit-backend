@@ -1,14 +1,15 @@
 import graphene
-from graphene_django import DjangoObjectType
-from apps.core.models import Category
+
 from apps.buckets.models import BucketItem
+from apps.core.models import Category
 from apps.recommendations.models import Recommendation
-from .models import WeatherData, UserInsight, HomeData
+
+from .models import HomeData, UserInsight, WeatherData
 
 
 class WeatherType(graphene.ObjectType):
     """GraphQL Weather type"""
-    
+
     city = graphene.String()
     condition = graphene.String()
     temperature = graphene.Float()
@@ -16,14 +17,14 @@ class WeatherType(graphene.ObjectType):
 
 class DestinationType(graphene.ObjectType):
     """GraphQL Destination type"""
-    
+
     location = graphene.String()
     days_away = graphene.Int()
 
 
 class ProgressType(graphene.ObjectType):
     """GraphQL Progress type"""
-    
+
     remaining = graphene.Int()
     completed = graphene.Int()
     yearly_goal = graphene.Int()
@@ -32,7 +33,7 @@ class ProgressType(graphene.ObjectType):
 
 class InsightsDataType(graphene.ObjectType):
     """GraphQL InsightsData type"""
-    
+
     id = graphene.String()
     weather = graphene.Field(WeatherType)
     next_destination = graphene.Field(DestinationType)
@@ -42,7 +43,7 @@ class InsightsDataType(graphene.ObjectType):
 
 class HomeDataType(graphene.ObjectType):
     """GraphQL HomeData type"""
-    
+
     id = graphene.String()
     greeting = graphene.String()
     time_of_day = graphene.String()

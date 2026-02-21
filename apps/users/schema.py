@@ -1,23 +1,26 @@
-import graphene
 import uuid
 from datetime import timedelta
-from django.contrib.gis.geos import Point
-from apps.users.models import User as UserModel, UserProfile as UserProfileModel, UserSession as UserSessionModel, RefreshToken, Interest
-from apps.users.authentication import JWTService
-from apps.users.types import AuthPayloadType,  UserProfileType, UserType
-from django.utils import timezone
-from django.db import transaction
-from django.conf import settings
-from graphql import GraphQLError
 
+import graphene
+from django.conf import settings
+from django.contrib.gis.geos import Point
+from django.db import transaction
+from django.utils import timezone
+from google.auth.transport import requests as google_requests
 # Google OAuth
 from google.oauth2 import id_token
-from google.auth.transport import requests as google_requests
+from graphql import GraphQLError
 
+from apps.users.authentication import JWTService
+from apps.users.models import Interest, RefreshToken
+from apps.users.models import User as UserModel
+from apps.users.models import UserSession as UserSessionModel
+from apps.users.types import AuthPayloadType, UserProfileType, UserType
 
 # =============================================================================
 # Helper Functions
 # =============================================================================
+
 
 def verify_google_token(token):
     """Verify Google ID token and return user info"""
@@ -58,8 +61,6 @@ def verify_google_token(token):
     return None
 
 
-
-
 # =============================================================================
 # Mutation Classes (Alphabetical Order)
 # =============================================================================
@@ -77,7 +78,11 @@ class CompleteOnboarding(graphene.Mutation):
     ok = graphene.Boolean()
     user = graphene.Field(UserType)
 
-    def mutate(self, info, allow_location_sharing=None, location_name=None, location=None, allow_push_notifications=None, allow_email_notifications=None, interests=None):
+    def mutate(
+        self, info, allow_location_sharing=None, location_name=None,
+        location=None, allow_push_notifications=None,
+        allow_email_notifications=None, interests=None
+    ):
         user = info.context.user
         if user.is_anonymous:
             raise GraphQLError(message="Not authenticated", extensions={"code": "NOT_AUTHENTICATED"})
@@ -104,6 +109,7 @@ class CompleteOnboarding(graphene.Mutation):
             profile.interests.set(interest_objs)
 
         return CompleteOnboarding(ok=True, user=user)
+
 
 class GoogleSignIn(graphene.Mutation):
     """Google sign in mutation - handles both sign up and sign in"""
@@ -233,7 +239,10 @@ class RefreshAccessToken(graphene.Mutation):
 
         # 2. Check if expired
         if token_obj.expires_at < timezone.now():
-            raise GraphQLError(message="Refresh token expired. Please sign in again.", extensions={"code": "REFRESH_TOKEN_EXPIRED"})
+            raise GraphQLError(
+                message="Refresh token expired. Please sign in again.",
+                extensions={"code": "REFRESH_TOKEN_EXPIRED"}
+            )
 
         # 3. Check if user is still active
         if not token_obj.user.is_active:
@@ -402,7 +411,10 @@ class SignUp(graphene.Mutation):
     def mutate(self, info, email, password, first_name, last_name=None):
         # 1. Check if user already exists
         if UserModel.objects.filter(email=email).exists():
-            raise GraphQLError(message="Email already registered. Please sign in instead.", extensions={"code": "USER_EXISTS"})
+            raise GraphQLError(
+                message="Email already registered. Please sign in instead.",
+                extensions={"code": "USER_EXISTS"}
+            )
 
         try:
             with transaction.atomic():
@@ -460,7 +472,8 @@ class SignUp(graphene.Mutation):
             )
         except Exception as e:
             raise GraphQLError(message=str(e))
-        
+
+
 class SkipOnboarding(graphene.Mutation):
 
     """Skip onboarding mutation"""
@@ -481,6 +494,7 @@ class SkipOnboarding(graphene.Mutation):
 # =============================================================================
 # Combined Query and Mutation Classes
 # =============================================================================
+
 
 class UserQueries(graphene.ObjectType):
     """User Queries"""

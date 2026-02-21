@@ -1,7 +1,9 @@
 from django.contrib.gis import admin
-from .models import  Event
+
+from .models import Event
 
 # Register your models here.
+
 
 class EventAdmin(admin.GISModelAdmin):
     list_display = ('name', 'date', 'location_name', 'is_active')
@@ -29,5 +31,6 @@ class EventAdmin(admin.GISModelAdmin):
 
     class Media:
         js = ('events/js/geocode_location.js',)
+
 
 admin.site.register(Event, EventAdmin)

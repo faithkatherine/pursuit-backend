@@ -1,7 +1,9 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.translation import gettext_lazy as _
-from .models import User, UserProfile, Interest, LoginAttempt, RefreshToken, UserSession
+
+from .models import (Interest, LoginAttempt, RefreshToken, User, UserProfile,
+                     UserSession)
 
 
 @admin.register(User)
@@ -23,7 +25,11 @@ class UserAdmin(BaseUserAdmin):
             'fields': ('auth_provider', 'provider_id')
         }),
         (_('Security'), {
-            'fields': ('is_email_verified', 'email_verification_token_hash', 'email_verification_sent_at', 'password_reset_token_hash', 'password_reset_expires')
+            'fields': (
+                'is_email_verified', 'email_verification_token_hash',
+                'email_verification_sent_at', 'password_reset_token_hash',
+                'password_reset_expires'
+            )
         }),
         (_('Permissions'), {
             'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')
@@ -46,8 +52,14 @@ class UserAdmin(BaseUserAdmin):
 class UserProfileAdmin(admin.ModelAdmin):
     """User profile admin"""
 
-    list_display = ['user', 'location_name', 'is_profile_public', 'payment_plan', 'has_skipped_onboarding', 'is_onboarding_completed',  'created_at']
-    list_filter = ['is_profile_public', 'allow_email_notifications', 'allow_push_notifications', 'payment_plan', 'is_onboarding_completed']
+    list_display = [
+        'user', 'location_name', 'is_profile_public', 'payment_plan',
+        'has_skipped_onboarding', 'is_onboarding_completed', 'created_at'
+    ]
+    list_filter = [
+        'is_profile_public', 'allow_email_notifications',
+        'allow_push_notifications', 'payment_plan', 'is_onboarding_completed'
+    ]
     search_fields = ['user__email', 'user__first_name', 'user__last_name', 'location_name']
     readonly_fields = ['created_at', 'updated_at']
 
@@ -132,7 +144,10 @@ class UserSessionAdmin(admin.ModelAdmin):
     list_display = ['user', 'device_info', 'ip_address', 'is_active', 'created_at', 'last_active_at']
     list_filter = ['is_active', 'created_at']
     search_fields = ['user__email', 'device_info', 'ip_address']
-    readonly_fields = ['id', 'user', 'session_token', 'device_info', 'ip_address', 'user_agent', 'created_at', 'last_active_at']
+    readonly_fields = [
+        'id', 'user', 'session_token', 'device_info', 'ip_address',
+        'user_agent', 'created_at', 'last_active_at'
+    ]
 
     def has_add_permission(self, request):
         return False

@@ -1,9 +1,10 @@
 import os
+
 from celery import Celery
 from celery.schedules import crontab
 
 # Set the default Django settings module for the 'celery' program.
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'pursuit_backend.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'pursuit_backend.settings.production')
 
 app = Celery('pursuit_backend')
 

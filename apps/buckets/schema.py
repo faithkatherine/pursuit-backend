@@ -1,13 +1,14 @@
 import graphene
 from graphene_django import DjangoObjectType
-from apps.core.models import Category
-from .models import BucketList, BucketItem
 
+from apps.core.models import Category
+
+from .models import BucketItem, BucketList
 
 
 class CategoryType(DjangoObjectType):
     """GraphQL Category type"""
-    
+
     class Meta:
         model = Category
         fields = ['id', 'name', 'emoji', 'description', 'color']
@@ -44,7 +45,7 @@ class BucketItemType(DjangoObjectType):
 
 class BucketListType(DjangoObjectType):
     """GraphQL BucketList type"""
-    
+
     class Meta:
         model = BucketList
         fields = ['id', 'name', 'description', 'is_default', 'created_at']
@@ -53,37 +54,37 @@ class BucketListType(DjangoObjectType):
 # Mutations
 class AddBucketCategory(graphene.Mutation):
     """Add bucket category mutation"""
-    
+
     class Arguments:
         name = graphene.String(required=True)
         emoji = graphene.String()
-    
+
     category = graphene.Field(CategoryType)
-    
+
     def mutate(self, info, name, emoji=''):
         if not info.context.user.is_authenticated:
             raise Exception('Authentication required')
-        
+
         category = Category.objects.create(
             name=name,
             emoji=emoji
         )
-        
+
         return AddBucketCategory(category=category)
 
 
 class AddBucketItem(graphene.Mutation):
     """Add bucket item mutation"""
-    
+
     class Arguments:
         title = graphene.String(required=True)
         description = graphene.String()
         location = graphene.String()
         estimated_cost = graphene.Float()
         category_id = graphene.String()
-    
+
     bucket_item = graphene.Field(BucketItemType)
-    
+
     def mutate(self, info, title, description='', location='', estimated_cost=None, category_id=None):
         user = info.context.user
         if not user.is_authenticated:
@@ -111,7 +112,7 @@ class AddBucketItem(graphene.Mutation):
             estimated_cost=estimated_cost,
             category=category
         )
-        
+
         return AddBucketItem(bucket_item=bucket_item)
 
 
@@ -138,6 +139,6 @@ class BucketsQueries(graphene.ObjectType):
 # Mutations
 class BucketsMutations(graphene.ObjectType):
     """Buckets GraphQL mutations"""
-    
+
     add_bucket_category = AddBucketCategory.Field()
     add_bucket_item = AddBucketItem.Field()
