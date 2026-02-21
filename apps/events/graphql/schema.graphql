@@ -5,4 +5,9 @@ type Query {
   Get a paginated list of active events
   """
   getEvents(offset: Int, limit: Int, category: String): EventsListPayload!
+
+  """
+  Get a single active event by ID. Returns error for non-existent or inactive events.
+  """
+  getEvent(id: ID!): EventPayload!
 }

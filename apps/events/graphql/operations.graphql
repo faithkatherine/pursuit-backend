@@ -94,3 +94,52 @@ query GetEventsForMap($offset: Int, $limit: Int) {
     }
   }
 }
+
+# ─── SINGLE EVENT QUERIES ────────────────────────────────
+
+"""
+Get a single event by ID (all fields)
+"""
+query GetEvent($id: ID!) {
+  getEvent(id: $id) {
+    ok
+    event {
+      id
+      name
+      description
+      category {
+        id
+        name
+        icon
+      }
+      date
+      endDate
+      image
+      timezone
+      locationName
+      coordinates
+      moreDetailsUrl
+      isActive
+    }
+  }
+}
+
+"""
+Get a single event - minimal fields (for previews/cards)
+"""
+query GetEventMinimal($id: ID!) {
+  getEvent(id: $id) {
+    ok
+    event {
+      id
+      name
+      image
+      date
+      locationName
+      category {
+        name
+        icon
+      }
+    }
+  }
+}
