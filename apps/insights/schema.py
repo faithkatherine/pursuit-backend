@@ -49,9 +49,9 @@ class HomeDataType(graphene.ObjectType):
     time_of_day = graphene.String()
     weather = graphene.Field(WeatherType)
     insights = graphene.Field(InsightsDataType)
-    bucket_categories = graphene.List('apps.core.schema.CategoryType')
-    recommendations = graphene.List('apps.recommendations.schema.RecommendationType')
-    upcoming = graphene.List('apps.buckets.schema.BucketItemType')
+    bucket_categories = graphene.List("apps.core.schema.CategoryType")
+    recommendations = graphene.List("apps.recommendations.schema.RecommendationType")
+    upcoming = graphene.List("apps.buckets.schema.BucketItemType")
 
 
 class InsightsQueries(graphene.ObjectType):
@@ -69,28 +69,23 @@ class InsightsQueries(graphene.ObjectType):
         insight, created = UserInsight.objects.get_or_create(user=user)
 
         # Get weather data (mock for now)
-        weather = WeatherData.objects.filter(city=insight.current_city or 'New York').first()
+        weather = WeatherData.objects.filter(city=insight.current_city or "New York").first()
         if not weather:
-            weather = WeatherData(city='New York', condition='Sunny', temperature=72)
+            weather = WeatherData(city="New York", condition="Sunny", temperature=72)
 
         return InsightsDataType(
             id=str(insight.id),
-            weather=WeatherType(
-                city=weather.city,
-                condition=weather.condition,
-                temperature=weather.temperature
-            ),
+            weather=WeatherType(city=weather.city, condition=weather.condition, temperature=weather.temperature),
             next_destination=DestinationType(
-                location=insight.next_destination or 'Paris, France',
-                days_away=insight.days_to_next_trip or 45
+                location=insight.next_destination or "Paris, France", days_away=insight.days_to_next_trip or 45
             ),
             progress=ProgressType(
                 remaining=insight.remaining_items,
                 completed=insight.completed_items,
                 yearly_goal=insight.yearly_goal,
-                percentage=insight.progress_percentage
+                percentage=insight.progress_percentage,
             ),
-            recent_achievement=insight.recent_achievement or 'Visited 3 new cities this month!'
+            recent_achievement=insight.recent_achievement or "Visited 3 new cities this month!",
         )
 
     def resolve_get_home(self, info, offset=0, limit=10):
@@ -105,43 +100,32 @@ class InsightsQueries(graphene.ObjectType):
         insight, created = UserInsight.objects.get_or_create(user=user)
 
         # Get weather data
-        weather = WeatherData.objects.filter(city=insight.current_city or 'New York').first()
+        weather = WeatherData.objects.filter(city=insight.current_city or "New York").first()
         if not weather:
-            weather = WeatherData(city='New York', condition='Sunny', temperature=72)
+            weather = WeatherData(city="New York", condition="Sunny", temperature=72)
 
         return HomeDataType(
             id=str(home_data.id),
             greeting=f"Hello, {user.first_name}",
             time_of_day=home_data.time_of_day,
-            weather=WeatherType(
-                city=weather.city,
-                condition=weather.condition,
-                temperature=weather.temperature
-            ),
+            weather=WeatherType(city=weather.city, condition=weather.condition, temperature=weather.temperature),
             insights=InsightsDataType(
                 id=str(insight.id),
-                weather=WeatherType(
-                    city=weather.city,
-                    condition=weather.condition,
-                    temperature=weather.temperature
-                ),
+                weather=WeatherType(city=weather.city, condition=weather.condition, temperature=weather.temperature),
                 next_destination=DestinationType(
-                    location=insight.next_destination or 'Paris, France',
-                    days_away=insight.days_to_next_trip or 45
+                    location=insight.next_destination or "Paris, France", days_away=insight.days_to_next_trip or 45
                 ),
                 progress=ProgressType(
                     remaining=insight.remaining_items,
                     completed=insight.completed_items,
                     yearly_goal=insight.yearly_goal,
-                    percentage=insight.progress_percentage
+                    percentage=insight.progress_percentage,
                 ),
-                recent_achievement=insight.recent_achievement or 'Visited 3 new cities this month!'
+                recent_achievement=insight.recent_achievement or "Visited 3 new cities this month!",
             ),
             bucket_categories=Category.objects.filter(is_active=True)[:6],
             recommendations=Recommendation.objects.filter(is_active=True, is_featured=True)[:5],
             upcoming=BucketItem.objects.filter(
-                bucket_list__user=user,
-                is_completed=False,
-                target_date__isnull=False
-            ).order_by('target_date')[:5]
+                bucket_list__user=user, is_completed=False, target_date__isnull=False
+            ).order_by("target_date")[:5],
         )

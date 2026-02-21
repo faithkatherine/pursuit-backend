@@ -10,10 +10,10 @@ class JWTAuthenticationMiddleware:
 
     # Mutations that don't require authentication
     PUBLIC_MUTATIONS = {
-        'signIn',
-        'signUp',
-        'googleSignIn',
-        'refreshAccessToken',
+        "signIn",
+        "signUp",
+        "googleSignIn",
+        "refreshAccessToken",
     }
 
     def __init__(self):
@@ -27,12 +27,12 @@ class JWTAuthenticationMiddleware:
         operation_name = info.field_name
         if operation_name in self.PUBLIC_MUTATIONS:
             # Set anonymous user and allow the mutation to proceed
-            if not hasattr(request, 'user'):
+            if not hasattr(request, "user"):
                 request.user = AnonymousUser()
             return next(root, info, **args)
 
         # Skip if user is already authenticated
-        if hasattr(request, 'user') and request.user.is_authenticated:
+        if hasattr(request, "user") and request.user.is_authenticated:
             return next(root, info, **args)
 
         # Try to authenticate using JWT
@@ -43,7 +43,7 @@ class JWTAuthenticationMiddleware:
                 request.user = user
             else:
                 # No auth header or invalid format - set anonymous user
-                if not hasattr(request, 'user'):
+                if not hasattr(request, "user"):
                     request.user = AnonymousUser()
         except AuthenticationFailed as e:
             # Authentication failed - propagate as GraphQL error for token refresh
@@ -51,23 +51,20 @@ class JWTAuthenticationMiddleware:
             print(f"[JWTAuthenticationMiddleware] Auth failed: {error_message}")
 
             # Determine error code based on the error message
-            if 'expired' in error_message.lower():
-                error_code = 'TOKEN_EXPIRED'
+            if "expired" in error_message.lower():
+                error_code = "TOKEN_EXPIRED"
             else:
-                error_code = 'NOT_AUTHENTICATED'
+                error_code = "NOT_AUTHENTICATED"
 
             # Set anonymous user but also raise GraphQL error
-            if not hasattr(request, 'user'):
+            if not hasattr(request, "user"):
                 request.user = AnonymousUser()
 
-            raise GraphQLError(
-                error_message,
-                extensions={'code': error_code}
-            )
+            raise GraphQLError(error_message, extensions={"code": error_code})
         except Exception as e:
             # Other authentication errors - set anonymous user
             print(f"[JWTAuthenticationMiddleware] Unexpected auth error: {e}")
-            if not hasattr(request, 'user'):
+            if not hasattr(request, "user"):
                 request.user = AnonymousUser()
 
         return next(root, info, **args)

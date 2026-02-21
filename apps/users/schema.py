@@ -7,6 +7,7 @@ from django.contrib.gis.geos import Point
 from django.db import transaction
 from django.utils import timezone
 from google.auth.transport import requests as google_requests
+
 # Google OAuth
 from google.oauth2 import id_token
 from graphql import GraphQLError
@@ -27,9 +28,9 @@ def verify_google_token(token):
     """Verify Google ID token and return user info"""
     # List of all valid client IDs (Web, iOS, Android)
     valid_client_ids = [
-        settings.GOOGLE_CLIENT_ID,           # Web
-        settings.GOOGLE_IOS_CLIENT_ID,       # iOS
-        settings.GOOGLE_ANDROID_CLIENT_ID,   # Android
+        settings.GOOGLE_CLIENT_ID,  # Web
+        settings.GOOGLE_IOS_CLIENT_ID,  # iOS
+        settings.GOOGLE_ANDROID_CLIENT_ID,  # Android
     ]
 
     # Try to verify with each client ID
@@ -39,20 +40,16 @@ def verify_google_token(token):
 
         try:
             # Verify the token with Google
-            idinfo = id_token.verify_oauth2_token(
-                token,
-                google_requests.Request(),
-                client_id
-            )
+            idinfo = id_token.verify_oauth2_token(token, google_requests.Request(), client_id)
 
             # Token is valid, return user info
             return {
-                'google_id': idinfo['sub'],
-                'email': idinfo['email'],
-                'email_verified': idinfo.get('email_verified', False),
-                'first_name': idinfo.get('given_name', ''),
-                'last_name': idinfo.get('family_name', ''),
-                'picture': idinfo.get('picture', ''),
+                "google_id": idinfo["sub"],
+                "email": idinfo["email"],
+                "email_verified": idinfo.get("email_verified", False),
+                "first_name": idinfo.get("given_name", ""),
+                "last_name": idinfo.get("family_name", ""),
+                "picture": idinfo.get("picture", ""),
             }
         except ValueError:
             # Try next client ID
@@ -66,8 +63,10 @@ def verify_google_token(token):
 # Mutation Classes (Alphabetical Order)
 # =============================================================================
 
+
 class CompleteOnboarding(graphene.Mutation):
     """Complete onboarding mutation"""
+
     class Arguments:
         allow_location_sharing = graphene.Boolean()
         location_name = graphene.String()
@@ -80,9 +79,14 @@ class CompleteOnboarding(graphene.Mutation):
     user = graphene.Field(UserType)
 
     def mutate(
-        self, info, allow_location_sharing=None, location_name=None,
-        location=None, allow_push_notifications=None,
-        allow_email_notifications=None, interests=None
+        self,
+        info,
+        allow_location_sharing=None,
+        location_name=None,
+        location=None,
+        allow_push_notifications=None,
+        allow_email_notifications=None,
+        interests=None,
     ):
         user = info.context.user
         if user.is_anonymous:
@@ -114,6 +118,7 @@ class CompleteOnboarding(graphene.Mutation):
 
 class GoogleSignIn(graphene.Mutation):
     """Google sign in mutation - handles both sign up and sign in"""
+
     class Arguments:
         id_token = graphene.String(required=True)
 
@@ -127,37 +132,34 @@ class GoogleSignIn(graphene.Mutation):
         if not google_user:
             raise GraphQLError(message="Invalid Google token", extensions={"code": "INVALID_GOOGLE_TOKEN"})
 
-        if not google_user['email_verified']:
+        if not google_user["email_verified"]:
             raise GraphQLError(message="Google email not verified", extensions={"code": "GOOGLE_EMAIL_NOT_VERIFIED"})
 
         try:
             with transaction.atomic():
                 # 2. Check if user exists (by provider_id OR email)
-                user = UserModel.objects.filter(
-                    provider_id=google_user['google_id'],
-                    auth_provider='google'
-                ).first()
+                user = UserModel.objects.filter(provider_id=google_user["google_id"], auth_provider="google").first()
 
                 if not user:
                     # Check if email exists with different auth provider
-                    existing_email_user = UserModel.objects.filter(email=google_user['email']).first()
+                    existing_email_user = UserModel.objects.filter(email=google_user["email"]).first()
 
                     if existing_email_user:
                         # User exists with email/password - link Google account
-                        existing_email_user.provider_id = google_user['google_id']
-                        existing_email_user.auth_provider = 'google'
+                        existing_email_user.provider_id = google_user["google_id"]
+                        existing_email_user.auth_provider = "google"
                         existing_email_user.is_email_verified = True
-                        existing_email_user.save(update_fields=['provider_id', 'auth_provider', 'is_email_verified'])
+                        existing_email_user.save(update_fields=["provider_id", "auth_provider", "is_email_verified"])
                         user = existing_email_user
                     else:
                         # 3. Create new user
                         user = UserModel.objects.create(
-                            email=google_user['email'],
-                            username=google_user['email'],
-                            first_name=google_user['first_name'],
-                            last_name=google_user['last_name'] or '',
-                            auth_provider='google',
-                            provider_id=google_user['google_id'],
+                            email=google_user["email"],
+                            username=google_user["email"],
+                            first_name=google_user["first_name"],
+                            last_name=google_user["last_name"] or "",
+                            auth_provider="google",
+                            provider_id=google_user["google_id"],
                             is_email_verified=True,  # Google already verified
                             # No password for Google users
                         )
@@ -173,9 +175,9 @@ class GoogleSignIn(graphene.Mutation):
                 session = UserSessionModel.objects.create(
                     user=user,
                     session_token=str(uuid.uuid4()),
-                    device_info=info.context.META.get('HTTP_USER_AGENT', 'Unknown')[:255],
-                    ip_address=info.context.META.get('REMOTE_ADDR', '127.0.0.1'),
-                    user_agent=info.context.META.get('HTTP_USER_AGENT', '')
+                    device_info=info.context.META.get("HTTP_USER_AGENT", "Unknown")[:255],
+                    ip_address=info.context.META.get("REMOTE_ADDR", "127.0.0.1"),
+                    user_agent=info.context.META.get("HTTP_USER_AGENT", ""),
                 )
 
                 # 6. Generate access token
@@ -183,15 +185,13 @@ class GoogleSignIn(graphene.Mutation):
 
                 # 7. Handle refresh token (same logic as SignIn)
                 existing_refresh = RefreshToken.objects.filter(
-                    user=user,
-                    is_revoked=False,
-                    expires_at__gt=timezone.now()
+                    user=user, is_revoked=False, expires_at__gt=timezone.now()
                 ).first()
 
                 if existing_refresh:
                     refresh_token_str = existing_refresh.token
                     existing_refresh.session = session
-                    existing_refresh.save(update_fields=['session'])
+                    existing_refresh.save(update_fields=["session"])
                 else:
                     refresh_token_str = JWTService.generate_refresh_token(user, session)
                     RefreshToken.objects.create(
@@ -210,7 +210,7 @@ class GoogleSignIn(graphene.Mutation):
                     refresh_token=refresh_token_str,
                     expires_in=3600,
                     user=user,
-                )
+                ),
             )
         except GraphQLError:
             raise  # Re-raise GraphQL errors as-is
@@ -220,6 +220,7 @@ class GoogleSignIn(graphene.Mutation):
 
 class RefreshAccessToken(graphene.Mutation):
     """Get new access token using refresh token"""
+
     class Arguments:
         refresh_token = graphene.String(required=True)
 
@@ -230,10 +231,9 @@ class RefreshAccessToken(graphene.Mutation):
 
     def mutate(self, info, refresh_token):
         # 1. Find the refresh token
-        token_obj = RefreshToken.objects.filter(
-            token=refresh_token,
-            is_revoked=False
-        ).select_related('user', 'session').first()
+        token_obj = (
+            RefreshToken.objects.filter(token=refresh_token, is_revoked=False).select_related("user", "session").first()
+        )
 
         if not token_obj:
             raise GraphQLError(message="Invalid refresh token", extensions={"code": "INVALID_REFRESH_TOKEN"})
@@ -241,8 +241,7 @@ class RefreshAccessToken(graphene.Mutation):
         # 2. Check if expired
         if token_obj.expires_at < timezone.now():
             raise GraphQLError(
-                message="Refresh token expired. Please sign in again.",
-                extensions={"code": "REFRESH_TOKEN_EXPIRED"}
+                message="Refresh token expired. Please sign in again.", extensions={"code": "REFRESH_TOKEN_EXPIRED"}
             )
 
         # 3. Check if user is still active
@@ -254,18 +253,19 @@ class RefreshAccessToken(graphene.Mutation):
 
         # 5. Sliding expiration - extend refresh token life if user is active
         token_obj.expires_at = timezone.now() + timedelta(days=30)
-        token_obj.save(update_fields=['expires_at'])
+        token_obj.save(update_fields=["expires_at"])
 
         return RefreshAccessToken(
             ok=True,
             access_token=access_token,
             refresh_token=refresh_token,  # Return same token (with extended life)
-            expires_in=3600
+            expires_in=3600,
         )
 
 
 class SignIn(graphene.Mutation):
     """Sign in mutation"""
+
     class Arguments:
         email = graphene.String(required=True)
         password = graphene.String(required=True)
@@ -294,9 +294,9 @@ class SignIn(graphene.Mutation):
                 session = UserSessionModel.objects.create(
                     user=user,
                     session_token=str(uuid.uuid4()),
-                    device_info=info.context.META.get('HTTP_USER_AGENT', 'Unknown')[:255],
-                    ip_address=info.context.META.get('REMOTE_ADDR', '127.0.0.1'),
-                    user_agent=info.context.META.get('HTTP_USER_AGENT', '')
+                    device_info=info.context.META.get("HTTP_USER_AGENT", "Unknown")[:255],
+                    ip_address=info.context.META.get("REMOTE_ADDR", "127.0.0.1"),
+                    user_agent=info.context.META.get("HTTP_USER_AGENT", ""),
                 )
 
                 # 5. Generate access token (short-lived, always new)
@@ -304,16 +304,14 @@ class SignIn(graphene.Mutation):
 
                 # 6. Check for existing valid refresh token
                 existing_refresh = RefreshToken.objects.filter(
-                    user=user,
-                    is_revoked=False,
-                    expires_at__gt=timezone.now()
+                    user=user, is_revoked=False, expires_at__gt=timezone.now()
                 ).first()
 
                 if existing_refresh:
                     # Reuse existing refresh token, update session link
                     refresh_token_str = existing_refresh.token
                     existing_refresh.session = session
-                    existing_refresh.save(update_fields=['session'])
+                    existing_refresh.save(update_fields=["session"])
                 else:
                     # Create new refresh token
                     refresh_token_str = JWTService.generate_refresh_token(user, session)
@@ -333,7 +331,7 @@ class SignIn(graphene.Mutation):
                     refresh_token=refresh_token_str,
                     expires_in=3600,
                     user=user,
-                )
+                ),
             )
         except Exception as e:
             raise GraphQLError(message=str(e), extensions={"code": "SIGN_IN_ERROR"})
@@ -341,6 +339,7 @@ class SignIn(graphene.Mutation):
 
 class SignOut(graphene.Mutation):
     """Sign out mutation - revokes only the current session/device"""
+
     class Arguments:
         refresh_token = graphene.String(required=True)  # Identify which session to revoke
 
@@ -348,28 +347,26 @@ class SignOut(graphene.Mutation):
 
     def mutate(self, info, refresh_token):
         # Find the refresh token
-        token_obj = RefreshToken.objects.filter(
-            token=refresh_token,
-            is_revoked=False
-        ).select_related('session').first()
+        token_obj = RefreshToken.objects.filter(token=refresh_token, is_revoked=False).select_related("session").first()
 
         if not token_obj:
             raise GraphQLError(message="Invalid or already revoked token", extensions={"code": "INVALID_TOKEN"})
 
         # Revoke only THIS refresh token
         token_obj.is_revoked = True
-        token_obj.save(update_fields=['is_revoked'])
+        token_obj.save(update_fields=["is_revoked"])
 
         # Deactivate only the associated session
         if token_obj.session:
             token_obj.session.is_active = False
-            token_obj.session.save(update_fields=['is_active'])
+            token_obj.session.save(update_fields=["is_active"])
 
         return SignOut(ok=True)
 
 
 class SignOutAll(graphene.Mutation):
     """Sign out from ALL devices - useful for security (password change, account compromise)"""
+
     class Arguments:
         refresh_token = graphene.String(required=True)  # Verify user owns this account
 
@@ -377,9 +374,7 @@ class SignOutAll(graphene.Mutation):
 
     def mutate(self, info, refresh_token):
         # Find the token to get the user
-        token_obj = RefreshToken.objects.filter(
-            token=refresh_token
-        ).select_related('user').first()
+        token_obj = RefreshToken.objects.filter(token=refresh_token).select_related("user").first()
 
         if not token_obj:
             raise GraphQLError(message="Invalid token", extensions={"code": "INVALID_TOKEN"})
@@ -397,6 +392,7 @@ class SignOutAll(graphene.Mutation):
 
 class SignUp(graphene.Mutation):
     """Sign up mutation"""
+
     class Arguments:
         email = graphene.String(required=True)
         password = graphene.String(required=True)
@@ -413,8 +409,7 @@ class SignUp(graphene.Mutation):
         # 1. Check if user already exists
         if UserModel.objects.filter(email=email).exists():
             raise GraphQLError(
-                message="Email already registered. Please sign in instead.",
-                extensions={"code": "USER_EXISTS"}
+                message="Email already registered. Please sign in instead.", extensions={"code": "USER_EXISTS"}
             )
 
         try:
@@ -425,8 +420,8 @@ class SignUp(graphene.Mutation):
                     password=password,
                     username=email,  # Use email as username
                     first_name=first_name,
-                    last_name=last_name or '',
-                    auth_provider='email',
+                    last_name=last_name or "",
+                    auth_provider="email",
                     is_email_verified=False,  # TODO: Implement email verification later
                 )
 
@@ -437,9 +432,9 @@ class SignUp(graphene.Mutation):
                 session = UserSessionModel.objects.create(
                     user=user,
                     session_token=str(uuid.uuid4()),
-                    device_info=info.context.META.get('HTTP_USER_AGENT', 'Unknown')[:255],
-                    ip_address=info.context.META.get('REMOTE_ADDR', '127.0.0.1'),
-                    user_agent=info.context.META.get('HTTP_USER_AGENT', '')
+                    device_info=info.context.META.get("HTTP_USER_AGENT", "Unknown")[:255],
+                    ip_address=info.context.META.get("REMOTE_ADDR", "127.0.0.1"),
+                    user_agent=info.context.META.get("HTTP_USER_AGENT", ""),
                 )
 
                 # 6. Generate tokens (user can use app but with limited access until verified)
@@ -469,15 +464,15 @@ class SignUp(graphene.Mutation):
                     refresh_token=refresh_token_str,
                     expires_in=3600,
                     user=user,
-                )
+                ),
             )
         except Exception as e:
             raise GraphQLError(message=str(e))
 
 
 class SkipOnboarding(graphene.Mutation):
-
     """Skip onboarding mutation"""
+
     user = graphene.Field(UserType)
     ok = graphene.Boolean()
 
@@ -492,6 +487,7 @@ class SkipOnboarding(graphene.Mutation):
 
         return SkipOnboarding(ok=True, user=user)
 
+
 # =============================================================================
 # Combined Query and Mutation Classes
 # =============================================================================
@@ -499,6 +495,7 @@ class SkipOnboarding(graphene.Mutation):
 
 class UserQueries(graphene.ObjectType):
     """User Queries"""
+
     user = graphene.Field(UserType)
     user_profile = graphene.Field(UserProfileType)
 
@@ -519,6 +516,7 @@ class UserQueries(graphene.ObjectType):
 
 class UserMutations(graphene.ObjectType):
     """User Mutations"""
+
     complete_onboarding = CompleteOnboarding.Field()
     google_sign_in = GoogleSignIn.Field()
     refresh_access_token = RefreshAccessToken.Field()

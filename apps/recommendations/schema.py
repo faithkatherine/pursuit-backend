@@ -14,8 +14,14 @@ class RecommendationType(DjangoObjectType):
     class Meta:
         model = Recommendation
         fields = [
-            'id', 'title', 'description', 'location_name', 'estimated_cost',
-            'recommendation_type', 'rating', 'created_at'
+            "id",
+            "title",
+            "description",
+            "location_name",
+            "estimated_cost",
+            "recommendation_type",
+            "rating",
+            "created_at",
         ]
 
     def resolve_amount(self, info):
@@ -34,4 +40,4 @@ class RecommendationsQueries(graphene.ObjectType):
     get_recommendations = graphene.List(RecommendationType, offset=graphene.Int(), limit=graphene.Int())
 
     def resolve_get_recommendations(self, info, offset=0, limit=10):
-        return Recommendation.objects.filter(is_active=True, is_featured=True)[offset:offset+limit]
+        return Recommendation.objects.filter(is_active=True, is_featured=True)[offset : offset + limit]

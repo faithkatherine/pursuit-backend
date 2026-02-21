@@ -1,4 +1,5 @@
 import graphene
+
 from .models import Category, Interest
 from .types import CategoryType, InterestType
 

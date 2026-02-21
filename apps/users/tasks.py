@@ -14,27 +14,19 @@ def cleanup_expired_tokens():
     cutoff_date = now - timezone.timedelta(days=30)
 
     # Delete expired refresh tokens
-    expired_tokens_count, _ = RefreshToken.objects.filter(
-        expires_at__lt=now
-    ).delete()
+    expired_tokens_count, _ = RefreshToken.objects.filter(expires_at__lt=now).delete()
 
     # Delete old revoked tokens (older than 30 days)
-    old_revoked_count, _ = RefreshToken.objects.filter(
-        is_revoked=True,
-        created_at__lt=cutoff_date
-    ).delete()
+    old_revoked_count, _ = RefreshToken.objects.filter(is_revoked=True, created_at__lt=cutoff_date).delete()
 
     # Delete old inactive sessions (older than 30 days)
-    old_sessions_count, _ = UserSession.objects.filter(
-        is_active=False,
-        created_at__lt=cutoff_date
-    ).delete()
+    old_sessions_count, _ = UserSession.objects.filter(is_active=False, created_at__lt=cutoff_date).delete()
 
     total_deleted = expired_tokens_count + old_revoked_count + old_sessions_count
 
     return {
-        'expired_tokens': expired_tokens_count,
-        'old_revoked_tokens': old_revoked_count,
-        'old_sessions': old_sessions_count,
-        'total': total_deleted
+        "expired_tokens": expired_tokens_count,
+        "old_revoked_tokens": old_revoked_count,
+        "old_sessions": old_sessions_count,
+        "total": total_deleted,
     }

@@ -7,7 +7,6 @@ from apps.core.types import CategoryType
 from .models import BucketItem, BucketList
 
 
-
 class BucketItemType(DjangoObjectType):
     """GraphQL BucketItem type"""
 
@@ -19,9 +18,18 @@ class BucketItemType(DjangoObjectType):
     class Meta:
         model = BucketItem
         fields = [
-            'id', 'title', 'description', 'location_name', 'estimated_cost',
-            'priority', 'difficulty', 'is_completed', 'progress_percentage',
-            'category', 'created_at', 'updated_at'
+            "id",
+            "title",
+            "description",
+            "location_name",
+            "estimated_cost",
+            "priority",
+            "difficulty",
+            "is_completed",
+            "progress_percentage",
+            "category",
+            "created_at",
+            "updated_at",
         ]
 
     def resolve_amount(self, info):
@@ -42,7 +50,7 @@ class BucketListType(DjangoObjectType):
 
     class Meta:
         model = BucketList
-        fields = ['id', 'name', 'description', 'is_default', 'created_at']
+        fields = ["id", "name", "description", "is_default", "created_at"]
 
 
 # Mutations
@@ -55,14 +63,11 @@ class AddBucketCategory(graphene.Mutation):
 
     category = graphene.Field(CategoryType)
 
-    def mutate(self, info, name, emoji=''):
+    def mutate(self, info, name, emoji=""):
         if not info.context.user.is_authenticated:
-            raise Exception('Authentication required')
+            raise Exception("Authentication required")
 
-        category = Category.objects.create(
-            name=name,
-            emoji=emoji
-        )
+        category = Category.objects.create(name=name, emoji=emoji)
 
         return AddBucketCategory(category=category)
 
@@ -79,16 +84,14 @@ class AddBucketItem(graphene.Mutation):
 
     bucket_item = graphene.Field(BucketItemType)
 
-    def mutate(self, info, title, description='', location='', estimated_cost=None, category_id=None):
+    def mutate(self, info, title, description="", location="", estimated_cost=None, category_id=None):
         user = info.context.user
         if not user.is_authenticated:
-            raise Exception('Authentication required')
+            raise Exception("Authentication required")
 
         # Get user's default bucket list
         bucket_list, created = BucketList.objects.get_or_create(
-            user=user,
-            is_default=True,
-            defaults={'name': 'My Bucket List'}
+            user=user, is_default=True, defaults={"name": "My Bucket List"}
         )
 
         category = None
@@ -104,7 +107,7 @@ class AddBucketItem(graphene.Mutation):
             description=description,
             location_name=location,
             estimated_cost=estimated_cost,
-            category=category
+            category=category,
         )
 
         return AddBucketItem(bucket_item=bucket_item)

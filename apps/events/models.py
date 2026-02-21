@@ -6,7 +6,7 @@ from django.core.exceptions import ValidationError
 class Event(models.Model):
     name = models.CharField(max_length=255, unique=True, null=False, blank=False)
     description = models.TextField(null=True, blank=True)
-    category = models.ManyToManyField('core.Category',  blank=True, related_name='events')
+    category = models.ManyToManyField("core.Category", blank=True, related_name="events")
     date = models.DateTimeField(null=False, blank=False)
     end_date = models.DateTimeField(null=True, blank=True)
     image = models.URLField(null=True, blank=True)
@@ -24,14 +24,14 @@ class Event(models.Model):
     def clean(self):
         super().clean()
         if self.end_date and self.end_date < self.date:
-            raise ValidationError('End date cannot be before start date.')
+            raise ValidationError("End date cannot be before start date.")
 
     class Meta:
-        verbose_name = 'Event'
-        verbose_name_plural = 'Events'
-        ordering = ['date']
+        verbose_name = "Event"
+        verbose_name_plural = "Events"
+        ordering = ["date"]
         indexes = [
-            models.Index(fields=['date']),
-            models.Index(fields=['location']),
-            models.Index(fields=['is_active', 'date']),
+            models.Index(fields=["date"]),
+            models.Index(fields=["location"]),
+            models.Index(fields=["is_active", "date"]),
         ]

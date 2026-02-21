@@ -7,15 +7,9 @@ from apps.recommendations.schema import RecommendationsQueries
 from apps.users.schema import UserMutations, UserQueries
 
 
-class Query(
-    BucketsQueries,
-    RecommendationsQueries,
-    InsightsQueries,
-    EventsQueries,
-    UserQueries,
-    graphene.ObjectType
-):
+class Query(BucketsQueries, RecommendationsQueries, InsightsQueries, EventsQueries, UserQueries, graphene.ObjectType):
     """Root Query combining all app queries"""
+
     # GraphQL requires at least one query field
     health = graphene.String(description="API health check")
 
@@ -23,12 +17,9 @@ class Query(
         return "ok"
 
 
-class Mutation(
-    UserMutations,
-    BucketsMutations,
-    graphene.ObjectType
-):
+class Mutation(UserMutations, BucketsMutations, graphene.ObjectType):
     """Root Mutation combining all app mutations"""
+
     pass
 
 

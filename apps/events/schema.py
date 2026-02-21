@@ -5,9 +5,11 @@ from .types import EventType
 
 MAX_LIMIT = 100
 
+
 class EventsListPayload(graphene.ObjectType):
     ok = graphene.Boolean(required=True)
     events = graphene.List(graphene.NonNull(EventType), required=True)
+
 
 class EventsQueries(graphene.ObjectType):
     get_events = graphene.Field(
@@ -26,7 +28,4 @@ class EventsQueries(graphene.ObjectType):
         if category:
             events = events.filter(category__name__iexact=category)
 
-        return EventsListPayload(
-            ok=True,
-            events=events[offset:offset + limit]
-        )
+        return EventsListPayload(ok=True, events=events[offset : offset + limit])

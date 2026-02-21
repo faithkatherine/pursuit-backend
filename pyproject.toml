@@ -1,0 +1,13 @@
+[tool.isort]
+profile = "black"
+skip = ["venv", "migrations"]
+line_length = 120
+
+[tool.black]
+line-length = 120
+exclude = '''
+/(
+    venv
+  | migrations
+)/
+'''

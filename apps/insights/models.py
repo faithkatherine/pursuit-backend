@@ -16,12 +16,12 @@ class WeatherData(TimeStampedModel):
     longitude = models.DecimalField(max_digits=11, decimal_places=8, blank=True, null=True)
 
     class Meta:
-        db_table = 'insights_weather_data'
-        verbose_name = 'Weather Data'
-        verbose_name_plural = 'Weather Data'
+        db_table = "insights_weather_data"
+        verbose_name = "Weather Data"
+        verbose_name_plural = "Weather Data"
         indexes = [
-            models.Index(fields=['city']),
-            models.Index(fields=['created_at']),
+            models.Index(fields=["city"]),
+            models.Index(fields=["created_at"]),
         ]
 
     def __str__(self):
@@ -31,7 +31,7 @@ class WeatherData(TimeStampedModel):
 class UserInsight(TimeStampedModel):
     """User insights and analytics"""
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='insights')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="insights")
 
     # Progress metrics
     total_bucket_items = models.PositiveIntegerField(default=0)
@@ -53,10 +53,10 @@ class UserInsight(TimeStampedModel):
     average_cost_per_item = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
 
     class Meta:
-        db_table = 'insights_user_insight'
-        verbose_name = 'User Insight'
-        verbose_name_plural = 'User Insights'
-        unique_together = ['user']
+        db_table = "insights_user_insight"
+        verbose_name = "User Insight"
+        verbose_name_plural = "User Insights"
+        unique_together = ["user"]
 
     def __str__(self):
         return f"Insights for {self.user.first_name}"
@@ -77,15 +77,15 @@ class UserInsight(TimeStampedModel):
 class HomeData(TimeStampedModel):
     """Home dashboard data"""
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='home_data')
-    greeting = models.CharField(max_length=100, default='Hello')
-    time_of_day = models.CharField(max_length=20, default='morning')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="home_data")
+    greeting = models.CharField(max_length=100, default="Hello")
+    time_of_day = models.CharField(max_length=20, default="morning")
 
     class Meta:
-        db_table = 'insights_home_data'
-        verbose_name = 'Home Data'
-        verbose_name_plural = 'Home Data'
-        unique_together = ['user']
+        db_table = "insights_home_data"
+        verbose_name = "Home Data"
+        verbose_name_plural = "Home Data"
+        unique_together = ["user"]
 
     def __str__(self):
         return f"Home data for {self.user.first_name}"

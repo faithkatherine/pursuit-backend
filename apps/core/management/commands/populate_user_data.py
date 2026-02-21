@@ -11,40 +11,38 @@ User = get_user_model()
 
 
 class Command(BaseCommand):
-    help = 'Populate data for a specific user by email'
+    help = "Populate data for a specific user by email"
 
     def add_arguments(self, parser):
-        parser.add_argument('email', type=str, help='Email of the user to populate data for')
+        parser.add_argument("email", type=str, help="Email of the user to populate data for")
 
     def handle(self, *args, **kwargs):
-        email = kwargs['email']
+        email = kwargs["email"]
 
         try:
             user = User.objects.get(email=email)
         except User.DoesNotExist:
-            self.stdout.write(self.style.ERROR(f'User with email {email} does not exist'))
+            self.stdout.write(self.style.ERROR(f"User with email {email} does not exist"))
             return
 
-        self.stdout.write(f'Populating data for user: {user.email}')
+        self.stdout.write(f"Populating data for user: {user.email}")
 
         # Get categories
         categories = {cat.name: cat for cat in Category.objects.all()}
 
         if not categories:
-            self.stdout.write(self.style.ERROR('No categories found. Run populate_sample_data first.'))
+            self.stdout.write(self.style.ERROR("No categories found. Run populate_sample_data first."))
             return
 
         # Create bucket list for user
         bucket_list, created = BucketList.objects.get_or_create(
-            user=user,
-            is_default=True,
-            defaults={'name': 'My Bucket List', 'description': 'My adventure bucket list'}
+            user=user, is_default=True, defaults={"name": "My Bucket List", "description": "My adventure bucket list"}
         )
 
         if created:
-            self.stdout.write(self.style.SUCCESS('Created default bucket list'))
+            self.stdout.write(self.style.SUCCESS("Created default bucket list"))
         else:
-            self.stdout.write('Bucket list already exists')
+            self.stdout.write("Bucket list already exists")
 
         # Create sample bucket items with target dates
         bucket_items_data = [
@@ -99,25 +97,25 @@ class Command(BaseCommand):
                 defaults={
                     **item_data,
                     "category": category,
-                }
+                },
             )
             if created:
                 created_count += 1
 
-        self.stdout.write(self.style.SUCCESS(f'Created {created_count} new bucket items'))
+        self.stdout.write(self.style.SUCCESS(f"Created {created_count} new bucket items"))
 
         # Create or update user insights
         insight, created = UserInsight.objects.get_or_create(
             user=user,
             defaults={
-                'total_bucket_items': BucketItem.objects.filter(bucket_list__user=user).count(),
-                'completed_items': BucketItem.objects.filter(bucket_list__user=user, is_completed=True).count(),
-                'yearly_goal': 25,
-                'current_city': 'San Francisco',
-                'next_destination': 'Bali, Indonesia',
-                'days_to_next_trip': 45,
-                'recent_achievement': 'Started your bucket list journey!',
-            }
+                "total_bucket_items": BucketItem.objects.filter(bucket_list__user=user).count(),
+                "completed_items": BucketItem.objects.filter(bucket_list__user=user, is_completed=True).count(),
+                "yearly_goal": 25,
+                "current_city": "San Francisco",
+                "next_destination": "Bali, Indonesia",
+                "days_to_next_trip": 45,
+                "recent_achievement": "Started your bucket list journey!",
+            },
         )
 
         if not created:
@@ -125,8 +123,8 @@ class Command(BaseCommand):
             insight.total_bucket_items = BucketItem.objects.filter(bucket_list__user=user).count()
             insight.completed_items = BucketItem.objects.filter(bucket_list__user=user, is_completed=True).count()
             insight.save()
-            self.stdout.write('Updated user insights')
+            self.stdout.write("Updated user insights")
         else:
-            self.stdout.write(self.style.SUCCESS('Created user insights'))
+            self.stdout.write(self.style.SUCCESS("Created user insights"))
 
-        self.stdout.write(self.style.SUCCESS(f'Data population completed for {user.email}!'))
+        self.stdout.write(self.style.SUCCESS(f"Data population completed for {user.email}!"))

@@ -8,7 +8,7 @@ from .base import *  # noqa: F401,F403
 
 DEBUG = True
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ["*"]
 
 CORS_ALLOW_ALL_ORIGINS = True
 
@@ -17,7 +17,7 @@ SECURE_BROWSER_XSS_FILTER = False
 SECURE_CONTENT_TYPE_NOSNIFF = False
 
 # Console email for local dev
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 # JWT: fall back to SECRET_KEY in development if JWT_SECRET_KEY not set
 if not JWT_SECRET_KEY:  # noqa: F405

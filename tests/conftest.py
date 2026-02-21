@@ -24,11 +24,7 @@ def api_client():
 def user():
     """Test user"""
     return User.objects.create_user(
-        email='test@example.com',
-        username='testuser',
-        first_name='Test',
-        last_name='User',
-        password='testpassword123'
+        email="test@example.com", username="testuser", first_name="Test", last_name="User", password="testpassword123"
     )
 
 
@@ -36,7 +32,7 @@ def user():
 def authenticated_api_client(api_client, user):
     """API client with authenticated user"""
     token = JWTService.generate_access_token(user)
-    api_client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
     return api_client
 
 
@@ -44,9 +40,5 @@ def authenticated_api_client(api_client, user):
 def superuser():
     """Test superuser"""
     return User.objects.create_superuser(
-        email='admin@example.com',
-        username='admin',
-        first_name='Admin',
-        last_name='User',
-        password='adminpassword123'
+        email="admin@example.com", username="admin", first_name="Admin", last_name="User", password="adminpassword123"
     )
