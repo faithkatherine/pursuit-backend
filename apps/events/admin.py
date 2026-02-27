@@ -1,6 +1,6 @@
 from django.contrib.gis import admin
 
-from .models import Event
+from .models import Event, UserEvents
 
 # Register your models here.
 
@@ -32,3 +32,13 @@ class EventAdmin(admin.GISModelAdmin):
 
 
 admin.site.register(Event, EventAdmin)
+
+
+class UserEventsAdmin(admin.ModelAdmin):
+    list_display = ("user", "event", "created_at")
+    search_fields = ("user__username", "event__name")
+    list_filter = ("created_at",)
+    readonly_fields = ("created_at",)
+
+
+admin.site.register(UserEvents, UserEventsAdmin)

@@ -1,7 +1,7 @@
 import graphene
 
 from apps.buckets.schema import BucketsMutations, BucketsQueries
-from apps.events.schema import EventsQueries
+from apps.events.schema import EventsMutations, EventsQueries
 from apps.insights.schema import InsightsQueries
 from apps.recommendations.schema import RecommendationsQueries
 from apps.users.schema import UserMutations, UserQueries
@@ -17,7 +17,7 @@ class Query(BucketsQueries, RecommendationsQueries, InsightsQueries, EventsQueri
         return "ok"
 
 
-class Mutation(UserMutations, BucketsMutations, graphene.ObjectType):
+class Mutation(UserMutations, BucketsMutations, EventsMutations, graphene.ObjectType):
     """Root Mutation combining all app mutations"""
 
     pass

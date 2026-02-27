@@ -8,6 +8,7 @@ class EventType(DjangoObjectType):
     """Event GraphQL type"""
 
     coordinates = graphene.List(graphene.Float)
+    is_saved = graphene.Boolean()
 
     class Meta:
         model = Event
@@ -26,6 +27,12 @@ class EventType(DjangoObjectType):
             "updated_at",
             "is_active",
         )
+
+    def resolve_is_saved(self, info):
+        user = info.context.user
+        if not user.is_authenticated:
+            return False
+        return self.user_interactions.filter(user=user).exists()
 
     def resolve_coordinates(self, info):
         if self.location is None:

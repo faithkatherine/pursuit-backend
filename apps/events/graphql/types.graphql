@@ -18,6 +18,7 @@ type Event {
   createdAt: DateTime!
   updatedAt: DateTime!
   isActive: Boolean!
+  isSaved: Boolean!
 }
 
 """
@@ -34,4 +35,10 @@ Response payload for single event query
 type EventPayload {
   ok: Boolean!
   event: Event
+}
+
+type SavedEventPayload {
+  ok: Boolean!
+  event: Event
+  errors: [String!]!
 }

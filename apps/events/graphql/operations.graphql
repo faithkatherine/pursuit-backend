@@ -34,8 +34,8 @@ query GetEvents {
 """
 Get events with pagination
 """
-query GetEventsWithPagination($offset: Int, $limit: Int, $category: String) {
-  getEvents(offset: $offset, limit: $limit, category: $category) {
+query EventsWithPagination($offset: Int, $limit: Int, $category: String) {
+  Events(offset: $offset, limit: $limit, category: $category) {
     ok
     events {
       id
@@ -61,8 +61,8 @@ query GetEventsWithPagination($offset: Int, $limit: Int, $category: String) {
 """
 Get events - minimal fields (for list/card views)
 """
-query GetEventsMinimal($offset: Int, $limit: Int) {
-  getEvents(offset: $offset, limit: $limit) {
+query EventsMinimal($offset: Int, $limit: Int) {
+  Events(offset: $offset, limit: $limit) {
     ok
     events {
       id
@@ -81,8 +81,8 @@ query GetEventsMinimal($offset: Int, $limit: Int) {
 """
 Get events - with location data (for map views)
 """
-query GetEventsForMap($offset: Int, $limit: Int) {
-  getEvents(offset: $offset, limit: $limit) {
+query EventsForMap($offset: Int, $limit: Int) {
+  Events(offset: $offset, limit: $limit) {
     ok
     events {
       id
@@ -100,8 +100,8 @@ query GetEventsForMap($offset: Int, $limit: Int) {
 """
 Get a single event by ID (all fields)
 """
-query GetEvent($id: ID!) {
-  getEvent(id: $id) {
+query Event($id: ID!) {
+  Event(id: $id) {
     ok
     event {
       id
@@ -127,8 +127,8 @@ query GetEvent($id: ID!) {
 """
 Get a single event - minimal fields (for previews/cards)
 """
-query GetEventMinimal($id: ID!) {
-  getEvent(id: $id) {
+query EventMinimal($id: ID!) {
+  Event(id: $id) {
     ok
     event {
       id
@@ -140,6 +140,71 @@ query GetEventMinimal($id: ID!) {
         name
         icon
       }
+    }
+  }
+}
+
+# ─── MUTATIONS ────────────────────────────────────────────
+
+"""Mutation to save an event for the user"""
+mutation SaveEvent($id: ID!) {
+  saveEvent(id: $id) {
+    ok
+    event {
+      id
+      name
+      description
+      date
+      locationName
+      coordinates
+      isActive
+      isSaved
+      category {
+        id
+        name
+      }
+    }
+    errors
+  }
+}
+
+"""Mutation to unsave an event for the user"""
+mutation UnsaveEvent($id: ID!) {
+  unsaveEvent(id: $id) {
+    ok
+    event {
+      id
+      name
+      isSaved
+    }
+    errors
+  }
+}
+
+# ─── SAVED EVENTS QUERIES ────────────────────────────────
+
+"""Get user's saved events"""
+query SavedEvents {
+  savedEvents {
+    ok
+    events {
+      id
+      name
+      description
+      category {
+        id
+        name
+        icon
+      }
+      date
+      endDate
+      image
+      timezone
+      locationName
+      coordinates
+      moreDetailsUrl
+      isActive
+      isSaved
     }
   }
 }

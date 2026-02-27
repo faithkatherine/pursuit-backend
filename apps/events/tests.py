@@ -8,7 +8,7 @@ from django.test import Client
 from django.utils import timezone
 
 from apps.core.models import Category
-from apps.events.models import Event
+from apps.events.models import Event, UserEvents
 from apps.users.authentication import JWTService
 
 User = get_user_model()
@@ -27,11 +27,27 @@ def user(db):
 
 
 @pytest.fixture
+def other_user(db):
+    return User.objects.create_user(
+        email="otheruser@example.com",
+        password="securepass123",
+        username="otheruser",
+        first_name="Other",
+    )
+
+
+@pytest.fixture
 def auth_client(user):
     """Django test client with JWT Authorization header."""
     token = JWTService.generate_access_token(user)
     client = Client(HTTP_AUTHORIZATION=f"Bearer {token}")
     return client
+
+
+@pytest.fixture
+def anon_client():
+    """Django test client without authentication."""
+    return Client()
 
 
 @pytest.fixture
@@ -79,15 +95,15 @@ def future_event(db, another_category):
     return event
 
 
-# ─── HELPER ──────────────────────────────────────────────
+# ─── HELPERS ──────────────────────────────────────────────
 
 
-def _query_events(auth_client, variables=None):
-    """Execute the getEvents GraphQL query and return parsed JSON."""
-    body = {"query": GET_EVENTS_QUERY}
+def _gql(client, query, variables=None):
+    """Execute a GraphQL request and return parsed JSON."""
+    body = {"query": query}
     if variables:
         body["variables"] = variables
-    response = auth_client.post(
+    response = client.post(
         "/graphql/",
         json.dumps(body),
         content_type="application/json",
@@ -134,11 +150,41 @@ class TestEventModel:
         assert active_event.category.count() == 2
 
 
-# ─── GRAPHQL QUERY TESTS ─────────────────────────────────
+@pytest.mark.django_db
+class TestUserEventsModel:
+    def test_create_saved_event(self, user, active_event):
+        saved = UserEvents.objects.create(user=user, event=active_event)
+        assert saved.id is not None
+        assert saved.user == user
+        assert saved.event == active_event
+
+    def test_str_representation(self, user, active_event):
+        saved = UserEvents.objects.create(user=user, event=active_event)
+        assert str(saved) == "eventuser@example.com saved Jazz Festival"
+
+    def test_unique_together_prevents_duplicates(self, user, active_event):
+        UserEvents.objects.create(user=user, event=active_event)
+        from django.db import IntegrityError
+
+        with pytest.raises(IntegrityError):
+            UserEvents.objects.create(user=user, event=active_event)
+
+    def test_cascade_delete_user(self, user, active_event):
+        UserEvents.objects.create(user=user, event=active_event)
+        user.delete()
+        assert UserEvents.objects.count() == 0
+
+    def test_cascade_delete_event(self, user, active_event):
+        UserEvents.objects.create(user=user, event=active_event)
+        active_event.delete()
+        assert UserEvents.objects.count() == 0
+
+
+# ─── GRAPHQL QUERY STRINGS ───────────────────────────────
 
 GET_EVENTS_QUERY = """
     query GetEvents($offset: Int, $limit: Int, $category: String) {
-        getEvents(offset: $offset, limit: $limit, category: $category) {
+        events(offset: $offset, limit: $limit, category: $category) {
             ok
             events {
                 id
@@ -157,89 +203,9 @@ GET_EVENTS_QUERY = """
     }
 """
 
-
-@pytest.mark.django_db
-class TestGetEventsQuery:
-    def test_returns_active_events_only(self, auth_client, active_event, inactive_event):
-        resp_json = _query_events(auth_client)
-        data = resp_json["data"]["getEvents"]
-
-        assert data["ok"] is True
-        names = [e["name"] for e in data["events"]]
-        assert "Jazz Festival" in names
-        assert "Cancelled Show" not in names
-
-    def test_returns_empty_list_when_no_events(self, auth_client):
-        resp_json = _query_events(auth_client)
-        data = resp_json["data"]["getEvents"]
-
-        assert data["ok"] is True
-        assert data["events"] == []
-
-    def test_filter_by_category(self, auth_client, active_event, future_event):
-        resp_json = _query_events(auth_client, {"category": "Music"})
-        data = resp_json["data"]["getEvents"]
-
-        assert data["ok"] is True
-        assert len(data["events"]) == 1
-        assert data["events"][0]["name"] == "Jazz Festival"
-
-    def test_filter_by_category_case_insensitive(self, auth_client, active_event):
-        resp_json = _query_events(auth_client, {"category": "music"})
-        data = resp_json["data"]["getEvents"]
-
-        assert len(data["events"]) == 1
-
-    def test_pagination_offset(self, auth_client, active_event, future_event):
-        resp_json = _query_events(auth_client, {"offset": 1, "limit": 10})
-        data = resp_json["data"]["getEvents"]
-
-        assert len(data["events"]) == 1
-
-    def test_pagination_limit(self, auth_client, active_event, future_event):
-        resp_json = _query_events(auth_client, {"limit": 1})
-        data = resp_json["data"]["getEvents"]
-
-        assert len(data["events"]) == 1
-
-    def test_negative_offset_clamped_to_zero(self, auth_client, active_event):
-        resp_json = _query_events(auth_client, {"offset": -5})
-        data = resp_json["data"]["getEvents"]
-
-        assert data["ok"] is True
-        assert len(data["events"]) == 1
-
-    def test_limit_clamped_to_max(self, auth_client, active_event):
-        resp_json = _query_events(auth_client, {"limit": 500})
-        data = resp_json["data"]["getEvents"]
-
-        assert data["ok"] is True
-
-    def test_event_includes_all_fields(self, auth_client, active_event):
-        resp_json = _query_events(auth_client)
-        event = resp_json["data"]["getEvents"]["events"][0]
-
-        assert "id" in event
-        assert "name" in event
-        assert "description" in event
-        assert "date" in event
-        assert "locationName" in event
-        assert "coordinates" in event
-        assert "category" in event
-
-    def test_event_category_data(self, auth_client, active_event):
-        resp_json = _query_events(auth_client)
-        event = resp_json["data"]["getEvents"]["events"][0]
-
-        assert len(event["category"]) == 1
-        assert event["category"][0]["name"] == "Music"
-
-
-# ─── GET SINGLE EVENT QUERY TESTS ──────────────────────
-
 GET_EVENT_QUERY = """
     query GetEvent($id: ID!) {
-        getEvent(id: $id) {
+        event(id: $id) {
             ok
             event {
                 id
@@ -258,33 +224,141 @@ GET_EVENT_QUERY = """
     }
 """
 
+SAVE_EVENT_MUTATION = """
+    mutation SaveEvent($id: ID!) {
+        saveEvent(id: $id) {
+            ok
+            event {
+                id
+                name
+            }
+            errors
+        }
+    }
+"""
 
-def _query_event(auth_client, event_id):
-    """Execute the getEvent GraphQL query and return parsed JSON."""
-    response = auth_client.post(
-        "/graphql/",
-        json.dumps({
-            "query": GET_EVENT_QUERY,
-            "variables": {"id": str(event_id)},
-        }),
-        content_type="application/json",
-    )
-    return response.json()
+UNSAVE_EVENT_MUTATION = """
+    mutation UnsaveEvent($id: ID!) {
+        unsaveEvent(id: $id) {
+            ok
+            event {
+                id
+                name
+            }
+            errors
+        }
+    }
+"""
+
+SAVED_EVENTS_QUERY = """
+    query {
+        savedEvents {
+            ok
+            events {
+                id
+                name
+            }
+        }
+    }
+"""
+
+
+# ─── EVENTS LIST QUERY TESTS ─────────────────────────────
 
 
 @pytest.mark.django_db
-class TestGetEventQuery:
+class TestEventsQuery:
+    def test_returns_active_events_only(self, auth_client, active_event, inactive_event):
+        resp = _gql(auth_client, GET_EVENTS_QUERY)
+        data = resp["data"]["events"]
+
+        assert data["ok"] is True
+        names = [e["name"] for e in data["events"]]
+        assert "Jazz Festival" in names
+        assert "Cancelled Show" not in names
+
+    def test_returns_empty_list_when_no_events(self, auth_client):
+        resp = _gql(auth_client, GET_EVENTS_QUERY)
+        data = resp["data"]["events"]
+
+        assert data["ok"] is True
+        assert data["events"] == []
+
+    def test_filter_by_category(self, auth_client, active_event, future_event):
+        resp = _gql(auth_client, GET_EVENTS_QUERY, {"category": "Music"})
+        data = resp["data"]["events"]
+
+        assert data["ok"] is True
+        assert len(data["events"]) == 1
+        assert data["events"][0]["name"] == "Jazz Festival"
+
+    def test_filter_by_category_case_insensitive(self, auth_client, active_event):
+        resp = _gql(auth_client, GET_EVENTS_QUERY, {"category": "music"})
+        data = resp["data"]["events"]
+
+        assert len(data["events"]) == 1
+
+    def test_pagination_offset(self, auth_client, active_event, future_event):
+        resp = _gql(auth_client, GET_EVENTS_QUERY, {"offset": 1, "limit": 10})
+        data = resp["data"]["events"]
+
+        assert len(data["events"]) == 1
+
+    def test_pagination_limit(self, auth_client, active_event, future_event):
+        resp = _gql(auth_client, GET_EVENTS_QUERY, {"limit": 1})
+        data = resp["data"]["events"]
+
+        assert len(data["events"]) == 1
+
+    def test_negative_offset_clamped_to_zero(self, auth_client, active_event):
+        resp = _gql(auth_client, GET_EVENTS_QUERY, {"offset": -5})
+        data = resp["data"]["events"]
+
+        assert data["ok"] is True
+        assert len(data["events"]) == 1
+
+    def test_limit_clamped_to_max(self, auth_client, active_event):
+        resp = _gql(auth_client, GET_EVENTS_QUERY, {"limit": 500})
+        data = resp["data"]["events"]
+
+        assert data["ok"] is True
+
+    def test_event_includes_all_fields(self, auth_client, active_event):
+        resp = _gql(auth_client, GET_EVENTS_QUERY)
+        event = resp["data"]["events"]["events"][0]
+
+        assert "id" in event
+        assert "name" in event
+        assert "description" in event
+        assert "date" in event
+        assert "locationName" in event
+        assert "coordinates" in event
+        assert "category" in event
+
+    def test_event_category_data(self, auth_client, active_event):
+        resp = _gql(auth_client, GET_EVENTS_QUERY)
+        event = resp["data"]["events"]["events"][0]
+
+        assert len(event["category"]) == 1
+        assert event["category"][0]["name"] == "Music"
+
+
+# ─── SINGLE EVENT QUERY TESTS ────────────────────────────
+
+
+@pytest.mark.django_db
+class TestEventQuery:
     def test_returns_active_event_by_id(self, auth_client, active_event):
-        resp_json = _query_event(auth_client, active_event.id)
-        data = resp_json["data"]["getEvent"]
+        resp = _gql(auth_client, GET_EVENT_QUERY, {"id": str(active_event.id)})
+        data = resp["data"]["event"]
 
         assert data["ok"] is True
         assert data["event"]["name"] == "Jazz Festival"
         assert data["event"]["id"] == str(active_event.id)
 
     def test_returns_all_fields(self, auth_client, active_event):
-        resp_json = _query_event(auth_client, active_event.id)
-        event = resp_json["data"]["getEvent"]["event"]
+        resp = _gql(auth_client, GET_EVENT_QUERY, {"id": str(active_event.id)})
+        event = resp["data"]["event"]["event"]
 
         assert "id" in event
         assert "name" in event
@@ -296,34 +370,163 @@ class TestGetEventQuery:
         assert "category" in event
 
     def test_includes_category_relationship(self, auth_client, active_event):
-        resp_json = _query_event(auth_client, active_event.id)
-        event = resp_json["data"]["getEvent"]["event"]
+        resp = _gql(auth_client, GET_EVENT_QUERY, {"id": str(active_event.id)})
+        event = resp["data"]["event"]["event"]
 
         assert len(event["category"]) == 1
         assert event["category"][0]["name"] == "Music"
 
     def test_nonexistent_event_returns_error(self, auth_client):
-        resp_json = _query_event(auth_client, 99999)
+        resp = _gql(auth_client, GET_EVENT_QUERY, {"id": "99999"})
 
-        errors = resp_json.get("errors")
+        errors = resp.get("errors")
         assert errors is not None
         assert "Event not found" in errors[0]["message"]
 
     def test_inactive_event_returns_error(self, auth_client, inactive_event):
-        resp_json = _query_event(auth_client, inactive_event.id)
+        resp = _gql(auth_client, GET_EVENT_QUERY, {"id": str(inactive_event.id)})
 
-        errors = resp_json.get("errors")
+        errors = resp.get("errors")
         assert errors is not None
         assert "Event not found" in errors[0]["message"]
 
     def test_event_with_multiple_categories(self, auth_client, active_event, another_category):
         active_event.category.add(another_category)
-        resp_json = _query_event(auth_client, active_event.id)
-        event = resp_json["data"]["getEvent"]["event"]
+        resp = _gql(auth_client, GET_EVENT_QUERY, {"id": str(active_event.id)})
+        event = resp["data"]["event"]["event"]
 
         assert len(event["category"]) == 2
         names = {c["name"] for c in event["category"]}
         assert names == {"Music", "Sports"}
+
+
+# ─── SAVE EVENT MUTATION TESTS ────────────────────────────
+
+
+@pytest.mark.django_db
+class TestSaveEventMutation:
+    def test_save_event_success(self, auth_client, user, active_event):
+        resp = _gql(auth_client, SAVE_EVENT_MUTATION, {"id": str(active_event.id)})
+        data = resp["data"]["saveEvent"]
+
+        assert data["ok"] is True
+        assert data["event"]["id"] == str(active_event.id)
+        assert data["event"]["name"] == "Jazz Festival"
+        assert data["errors"] == []
+        assert UserEvents.objects.filter(user=user, event=active_event).exists()
+
+    def test_duplicate_save_is_idempotent(self, auth_client, user, active_event):
+        _gql(auth_client, SAVE_EVENT_MUTATION, {"id": str(active_event.id)})
+        resp = _gql(auth_client, SAVE_EVENT_MUTATION, {"id": str(active_event.id)})
+        data = resp["data"]["saveEvent"]
+
+        assert data["ok"] is True
+        assert UserEvents.objects.filter(user=user, event=active_event).count() == 1
+
+    def test_save_nonexistent_event(self, auth_client):
+        resp = _gql(auth_client, SAVE_EVENT_MUTATION, {"id": "99999"})
+        data = resp["data"]["saveEvent"]
+
+        assert data["ok"] is False
+        assert data["event"] is None
+        assert "Event not found." in data["errors"]
+
+    def test_save_inactive_event(self, auth_client, inactive_event):
+        resp = _gql(auth_client, SAVE_EVENT_MUTATION, {"id": str(inactive_event.id)})
+        data = resp["data"]["saveEvent"]
+
+        assert data["ok"] is False
+        assert "Event not found." in data["errors"]
+
+    def test_save_event_unauthenticated(self, anon_client, active_event):
+        resp = _gql(anon_client, SAVE_EVENT_MUTATION, {"id": str(active_event.id)})
+        data = resp["data"]["saveEvent"]
+
+        assert data["ok"] is False
+        assert "Authentication required." in data["errors"]
+
+
+# ─── UNSAVE EVENT MUTATION TESTS ──────────────────────────
+
+
+@pytest.mark.django_db
+class TestUnsaveEventMutation:
+    def test_unsave_event_success(self, auth_client, user, active_event):
+        UserEvents.objects.create(user=user, event=active_event)
+        resp = _gql(auth_client, UNSAVE_EVENT_MUTATION, {"id": str(active_event.id)})
+        data = resp["data"]["unsaveEvent"]
+
+        assert data["ok"] is True
+        assert data["event"]["id"] == str(active_event.id)
+        assert data["errors"] == []
+        assert not UserEvents.objects.filter(user=user, event=active_event).exists()
+
+    def test_unsave_event_not_saved(self, auth_client, active_event):
+        resp = _gql(auth_client, UNSAVE_EVENT_MUTATION, {"id": str(active_event.id)})
+        data = resp["data"]["unsaveEvent"]
+
+        assert data["ok"] is False
+        assert "Event is not in your saved list." in data["errors"]
+
+    def test_unsave_nonexistent_event(self, auth_client):
+        resp = _gql(auth_client, UNSAVE_EVENT_MUTATION, {"id": "99999"})
+        data = resp["data"]["unsaveEvent"]
+
+        assert data["ok"] is False
+        assert "Event not found." in data["errors"]
+
+    def test_unsave_event_unauthenticated(self, anon_client, active_event):
+        resp = _gql(anon_client, UNSAVE_EVENT_MUTATION, {"id": str(active_event.id)})
+        data = resp["data"]["unsaveEvent"]
+
+        assert data["ok"] is False
+        assert "Authentication required." in data["errors"]
+
+
+# ─── SAVED EVENTS QUERY TESTS ────────────────────────────
+
+
+@pytest.mark.django_db
+class TestSavedEventsQuery:
+    def test_returns_saved_events(self, auth_client, user, active_event):
+        UserEvents.objects.create(user=user, event=active_event)
+        resp = _gql(auth_client, SAVED_EVENTS_QUERY)
+        data = resp["data"]["savedEvents"]
+
+        assert data["ok"] is True
+        assert len(data["events"]) == 1
+        assert data["events"][0]["name"] == "Jazz Festival"
+
+    def test_returns_empty_when_nothing_saved(self, auth_client):
+        resp = _gql(auth_client, SAVED_EVENTS_QUERY)
+        data = resp["data"]["savedEvents"]
+
+        assert data["ok"] is True
+        assert data["events"] == []
+
+    def test_excludes_inactive_events(self, auth_client, user, inactive_event):
+        UserEvents.objects.create(user=user, event=inactive_event)
+        resp = _gql(auth_client, SAVED_EVENTS_QUERY)
+        data = resp["data"]["savedEvents"]
+
+        assert data["ok"] is True
+        assert data["events"] == []
+
+    def test_only_returns_own_saved_events(self, auth_client, user, other_user, active_event, future_event):
+        UserEvents.objects.create(user=user, event=active_event)
+        UserEvents.objects.create(user=other_user, event=future_event)
+        resp = _gql(auth_client, SAVED_EVENTS_QUERY)
+        data = resp["data"]["savedEvents"]
+
+        assert len(data["events"]) == 1
+        assert data["events"][0]["name"] == "Jazz Festival"
+
+    def test_unauthenticated_returns_error(self, anon_client):
+        resp = _gql(anon_client, SAVED_EVENTS_QUERY)
+
+        errors = resp.get("errors")
+        assert errors is not None
+        assert "Authentication required." in errors[0]["message"]
 
 
 # ─── CACHE TESTS ────────────────────────────────────────
@@ -351,8 +554,8 @@ class TestEventsCache:
 
         # First request — cache miss
         assert cache.get(cache_key) is None
-        resp_json = _query_events(auth_client)
-        assert resp_json["data"]["getEvents"]["ok"] is True
+        resp = _gql(auth_client, GET_EVENTS_QUERY)
+        assert resp["data"]["events"]["ok"] is True
 
         # Cache is now populated
         cached = cache.get(cache_key)
@@ -387,12 +590,12 @@ class TestEventsCache:
 
     def test_cached_response_matches_fresh_response(self, auth_client, active_event):
         # First call — cache miss
-        resp1 = _query_events(auth_client)
+        resp1 = _gql(auth_client, GET_EVENTS_QUERY)
         # Second call — cache hit
-        resp2 = _query_events(auth_client)
+        resp2 = _gql(auth_client, GET_EVENTS_QUERY)
 
-        events1 = resp1["data"]["getEvents"]["events"]
-        events2 = resp2["data"]["getEvents"]["events"]
+        events1 = resp1["data"]["events"]["events"]
+        events2 = resp2["data"]["events"]["events"]
         assert [e["id"] for e in events1] == [e["id"] for e in events2]
 
     def test_category_filter_uses_separate_cache_key(self, auth_client, active_event, future_event):
@@ -401,9 +604,9 @@ class TestEventsCache:
         from apps.events.schema import _get_events_cache_version
 
         # Fetch all
-        _query_events(auth_client)
+        _gql(auth_client, GET_EVENTS_QUERY)
         # Fetch filtered
-        _query_events(auth_client, {"category": "Music"})
+        _gql(auth_client, GET_EVENTS_QUERY, {"category": "Music"})
 
         version = _get_events_cache_version()
         all_cached = cache.get(f"events:v{version}:all:0:20")

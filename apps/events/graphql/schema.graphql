@@ -4,10 +4,17 @@ type Query {
   """
   Get a paginated list of active events
   """
-  getEvents(offset: Int, limit: Int, category: String): EventsListPayload!
+  Events(offset: Int, limit: Int, category: String): EventsListPayload!
 
   """
   Get a single active event by ID. Returns error for non-existent or inactive events.
   """
-  getEvent(id: ID!): EventPayload!
+  Event(id: ID!): EventPayload!
+}
+
+type Mutation {
+  """
+  Create a new user event
+  """
+  saveEvent(id: ID!): UserEventPayload!
 }
