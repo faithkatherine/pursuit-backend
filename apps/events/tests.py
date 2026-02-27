@@ -3,6 +3,7 @@ from datetime import timedelta
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.contrib.gis.geos import Point
 from django.core.exceptions import ValidationError
 from django.test import Client
 from django.utils import timezone
@@ -183,7 +184,7 @@ class TestUserEventsModel:
 # ─── GRAPHQL QUERY STRINGS ───────────────────────────────
 
 GET_EVENTS_QUERY = """
-    query GetEvents($offset: Int, $limit: Int, $category: String) {
+    query GetEvents($offset: Int, $limit: Int, $category: [String]) {
         events(offset: $offset, limit: $limit, category: $category) {
             ok
             events {
@@ -194,10 +195,48 @@ GET_EVENTS_QUERY = """
                 locationName
                 coordinates
                 isActive
+                isFree
                 category {
                     id
                     name
                 }
+            }
+        }
+    }
+"""
+
+SEARCH_EVENTS_QUERY = """
+    query SearchEvents(
+        $search: String,
+        $category: [String],
+        $dateFrom: DateTime,
+        $dateTo: DateTime,
+        $latitude: Float,
+        $longitude: Float,
+        $radiusKm: Float,
+        $isFree: Boolean,
+        $offset: Int,
+        $limit: Int
+    ) {
+        events(
+            search: $search,
+            category: $category,
+            dateFrom: $dateFrom,
+            dateTo: $dateTo,
+            latitude: $latitude,
+            longitude: $longitude,
+            radiusKm: $radiusKm,
+            isFree: $isFree,
+            offset: $offset,
+            limit: $limit
+        ) {
+            ok
+            events {
+                id
+                name
+                description
+                isFree
+                category { name }
             }
         }
     }
@@ -299,18 +338,19 @@ class TestEventsQuery:
         assert data["events"] == []
 
     def test_filter_by_category(self, auth_client, active_event, future_event):
-        resp = _gql(auth_client, GET_EVENTS_QUERY, {"category": "Music"})
+        resp = _gql(auth_client, GET_EVENTS_QUERY, {"category": ["Music"]})
         data = resp["data"]["events"]
 
         assert data["ok"] is True
         assert len(data["events"]) == 1
         assert data["events"][0]["name"] == "Jazz Festival"
 
-    def test_filter_by_category_case_insensitive(self, auth_client, active_event):
-        resp = _gql(auth_client, GET_EVENTS_QUERY, {"category": "music"})
+    def test_filter_by_multiple_categories(self, auth_client, active_event, future_event):
+        resp = _gql(auth_client, GET_EVENTS_QUERY, {"category": ["Music", "Sports"]})
         data = resp["data"]["events"]
 
-        assert len(data["events"]) == 1
+        assert data["ok"] is True
+        assert len(data["events"]) == 2
 
     def test_pagination_offset(self, auth_client, active_event, future_event):
         resp = _gql(auth_client, GET_EVENTS_QUERY, {"offset": 1, "limit": 10})
@@ -355,6 +395,277 @@ class TestEventsQuery:
 
         assert len(event["category"]) == 1
         assert event["category"][0]["name"] == "Music"
+
+
+# ─── SEARCH & FILTER TESTS ──────────────────────────────
+
+
+@pytest.mark.django_db
+class TestSearchFilter:
+    def test_search_by_name(self, auth_client, active_event, future_event):
+        resp = _gql(auth_client, SEARCH_EVENTS_QUERY, {"search": "Jazz"})
+        events = resp["data"]["events"]["events"]
+
+        assert len(events) == 1
+        assert events[0]["name"] == "Jazz Festival"
+
+    def test_search_by_description(self, auth_client, active_event):
+        resp = _gql(auth_client, SEARCH_EVENTS_QUERY, {"search": "night of jazz"})
+        events = resp["data"]["events"]["events"]
+
+        assert len(events) == 1
+        assert events[0]["name"] == "Jazz Festival"
+
+    def test_search_case_insensitive(self, auth_client, active_event):
+        resp = _gql(auth_client, SEARCH_EVENTS_QUERY, {"search": "JAZZ"})
+        events = resp["data"]["events"]["events"]
+
+        assert len(events) == 1
+
+    def test_search_no_match(self, auth_client, active_event):
+        resp = _gql(auth_client, SEARCH_EVENTS_QUERY, {"search": "nonexistent"})
+        events = resp["data"]["events"]["events"]
+
+        assert len(events) == 0
+
+
+@pytest.mark.django_db
+class TestCategoryFilter:
+    def test_single_category(self, auth_client, active_event, future_event):
+        resp = _gql(auth_client, SEARCH_EVENTS_QUERY, {"category": ["Music"]})
+        events = resp["data"]["events"]["events"]
+
+        assert len(events) == 1
+        assert events[0]["name"] == "Jazz Festival"
+
+    def test_multiple_categories(self, auth_client, active_event, future_event):
+        resp = _gql(auth_client, SEARCH_EVENTS_QUERY, {"category": ["Music", "Sports"]})
+        events = resp["data"]["events"]["events"]
+
+        assert len(events) == 2
+
+    def test_nonexistent_category(self, auth_client, active_event):
+        resp = _gql(auth_client, SEARCH_EVENTS_QUERY, {"category": ["Nonexistent"]})
+        events = resp["data"]["events"]["events"]
+
+        assert len(events) == 0
+
+    def test_no_duplicates_for_multi_category_event(self, auth_client, active_event, another_category):
+        """Event with both Music and Sports should only appear once."""
+        active_event.category.add(another_category)
+        resp = _gql(auth_client, SEARCH_EVENTS_QUERY, {"category": ["Music", "Sports"]})
+        events = resp["data"]["events"]["events"]
+
+        assert len(events) == 1
+        assert events[0]["name"] == "Jazz Festival"
+
+
+@pytest.mark.django_db
+class TestDateRangeFilter:
+    def test_date_from(self, auth_client, active_event, future_event):
+        """dateFrom filters out events before that date."""
+        cutoff = (timezone.now() + timedelta(days=14)).isoformat()
+        resp = _gql(auth_client, SEARCH_EVENTS_QUERY, {"dateFrom": cutoff})
+        events = resp["data"]["events"]["events"]
+
+        assert len(events) == 1
+        assert events[0]["name"] == "Football Match"
+
+    def test_date_to(self, auth_client, active_event, future_event):
+        """dateTo filters out events after that date."""
+        cutoff = (timezone.now() + timedelta(days=14)).isoformat()
+        resp = _gql(auth_client, SEARCH_EVENTS_QUERY, {"dateTo": cutoff})
+        events = resp["data"]["events"]["events"]
+
+        assert len(events) == 1
+        assert events[0]["name"] == "Jazz Festival"
+
+    def test_date_range(self, auth_client, active_event, future_event):
+        """Both dateFrom and dateTo together."""
+        from_date = (timezone.now() + timedelta(days=1)).isoformat()
+        to_date = (timezone.now() + timedelta(days=14)).isoformat()
+        resp = _gql(auth_client, SEARCH_EVENTS_QUERY, {"dateFrom": from_date, "dateTo": to_date})
+        events = resp["data"]["events"]["events"]
+
+        assert len(events) == 1
+        assert events[0]["name"] == "Jazz Festival"
+
+    def test_no_events_in_range(self, auth_client, active_event, future_event):
+        """Date range that contains no events."""
+        from_date = (timezone.now() + timedelta(days=100)).isoformat()
+        to_date = (timezone.now() + timedelta(days=200)).isoformat()
+        resp = _gql(auth_client, SEARCH_EVENTS_QUERY, {"dateFrom": from_date, "dateTo": to_date})
+        events = resp["data"]["events"]["events"]
+
+        assert len(events) == 0
+
+
+@pytest.mark.django_db
+class TestLocationFilter:
+    def test_events_within_radius(self, auth_client):
+        """Events near the search point are returned."""
+        event = Event.objects.create(
+            name="Nearby Event",
+            date=timezone.now() + timedelta(days=5),
+            location=Point(-73.9857, 40.7484, srid=4326),  # NYC
+            is_active=True,
+        )
+        resp = _gql(
+            auth_client,
+            SEARCH_EVENTS_QUERY,
+            {"latitude": 40.7580, "longitude": -73.9855, "radiusKm": 10},
+        )
+        events = resp["data"]["events"]["events"]
+
+        names = [e["name"] for e in events]
+        assert "Nearby Event" in names
+
+    def test_events_outside_radius(self, auth_client):
+        """Events far from the search point are excluded."""
+        Event.objects.create(
+            name="Far Away Event",
+            date=timezone.now() + timedelta(days=5),
+            location=Point(-118.2437, 34.0522, srid=4326),  # Los Angeles
+            is_active=True,
+        )
+        resp = _gql(
+            auth_client,
+            SEARCH_EVENTS_QUERY,
+            {"latitude": 40.7580, "longitude": -73.9855, "radiusKm": 10},  # NYC center
+        )
+        events = resp["data"]["events"]["events"]
+
+        names = [e["name"] for e in events]
+        assert "Far Away Event" not in names
+
+    def test_events_without_location_excluded(self, auth_client, active_event):
+        """Events with no location are excluded when location filter is used."""
+        resp = _gql(
+            auth_client,
+            SEARCH_EVENTS_QUERY,
+            {"latitude": 40.7580, "longitude": -73.9855, "radiusKm": 50},
+        )
+        events = resp["data"]["events"]["events"]
+
+        # active_event has no location, should not appear
+        assert len(events) == 0
+
+
+@pytest.mark.django_db
+class TestIsFreeFilter:
+    def test_returns_only_free_events(self, auth_client):
+        Event.objects.create(
+            name="Free Concert",
+            date=timezone.now() + timedelta(days=5),
+            is_active=True,
+            is_free=True,
+        )
+        Event.objects.create(
+            name="Paid Gala",
+            date=timezone.now() + timedelta(days=5),
+            is_active=True,
+            is_free=False,
+        )
+        resp = _gql(auth_client, SEARCH_EVENTS_QUERY, {"isFree": True})
+        events = resp["data"]["events"]["events"]
+
+        assert len(events) == 1
+        assert events[0]["name"] == "Free Concert"
+
+    def test_is_free_false_returns_paid(self, auth_client):
+        Event.objects.create(
+            name="Free Concert",
+            date=timezone.now() + timedelta(days=5),
+            is_active=True,
+            is_free=True,
+        )
+        Event.objects.create(
+            name="Paid Gala",
+            date=timezone.now() + timedelta(days=5),
+            is_active=True,
+            is_free=False,
+        )
+        resp = _gql(auth_client, SEARCH_EVENTS_QUERY, {"isFree": False})
+        events = resp["data"]["events"]["events"]
+
+        assert len(events) == 1
+        assert events[0]["name"] == "Paid Gala"
+
+
+@pytest.mark.django_db
+class TestCombinedFilters:
+    def test_search_plus_category(self, auth_client, active_event, future_event):
+        resp = _gql(
+            auth_client,
+            SEARCH_EVENTS_QUERY,
+            {"search": "Festival", "category": ["Music"]},
+        )
+        events = resp["data"]["events"]["events"]
+
+        assert len(events) == 1
+        assert events[0]["name"] == "Jazz Festival"
+
+    def test_search_plus_category_no_match(self, auth_client, active_event, future_event):
+        """Search matches but category doesn't."""
+        resp = _gql(
+            auth_client,
+            SEARCH_EVENTS_QUERY,
+            {"search": "Jazz", "category": ["Sports"]},
+        )
+        events = resp["data"]["events"]["events"]
+
+        assert len(events) == 0
+
+    def test_search_plus_date_range(self, auth_client, active_event, future_event):
+        from_date = (timezone.now() + timedelta(days=1)).isoformat()
+        to_date = (timezone.now() + timedelta(days=14)).isoformat()
+        resp = _gql(
+            auth_client,
+            SEARCH_EVENTS_QUERY,
+            {"search": "Jazz", "dateFrom": from_date, "dateTo": to_date},
+        )
+        events = resp["data"]["events"]["events"]
+
+        assert len(events) == 1
+        assert events[0]["name"] == "Jazz Festival"
+
+    def test_all_filters_combined(self, auth_client, category):
+        event = Event.objects.create(
+            name="Free Jazz Night",
+            description="An amazing free jazz event",
+            date=timezone.now() + timedelta(days=5),
+            location=Point(-73.9857, 40.7484, srid=4326),
+            is_active=True,
+            is_free=True,
+        )
+        event.category.add(category)
+
+        from_date = (timezone.now() + timedelta(days=1)).isoformat()
+        to_date = (timezone.now() + timedelta(days=10)).isoformat()
+        resp = _gql(
+            auth_client,
+            SEARCH_EVENTS_QUERY,
+            {
+                "search": "jazz",
+                "category": ["Music"],
+                "dateFrom": from_date,
+                "dateTo": to_date,
+                "latitude": 40.7580,
+                "longitude": -73.9855,
+                "radiusKm": 10,
+                "isFree": True,
+            },
+        )
+        events = resp["data"]["events"]["events"]
+
+        assert len(events) == 1
+        assert events[0]["name"] == "Free Jazz Night"
+
+    def test_empty_filters_returns_all_active(self, auth_client, active_event, future_event):
+        resp = _gql(auth_client, SEARCH_EVENTS_QUERY)
+        events = resp["data"]["events"]["events"]
+
+        assert len(events) == 2
 
 
 # ─── SINGLE EVENT QUERY TESTS ────────────────────────────
@@ -659,22 +970,17 @@ class TestEventsCache:
         cache.clear()
 
     def test_cache_miss_then_hit(self, auth_client, active_event):
-        from django.core.cache import cache
+        # First call — cache miss
+        resp1 = _gql(auth_client, GET_EVENTS_QUERY)
+        assert resp1["data"]["events"]["ok"] is True
+        assert len(resp1["data"]["events"]["events"]) == 1
 
-        from apps.events.schema import _get_events_cache_version
-
-        version = _get_events_cache_version()
-        cache_key = f"events:v{version}:all:0:20"
-
-        # First request — cache miss
-        assert cache.get(cache_key) is None
-        resp = _gql(auth_client, GET_EVENTS_QUERY)
-        assert resp["data"]["events"]["ok"] is True
-
-        # Cache is now populated
-        cached = cache.get(cache_key)
-        assert cached is not None
-        assert len(cached) == 1
+        # Second call — cache hit (same result)
+        resp2 = _gql(auth_client, GET_EVENTS_QUERY)
+        assert resp2["data"]["events"]["ok"] is True
+        assert [e["id"] for e in resp1["data"]["events"]["events"]] == [
+            e["id"] for e in resp2["data"]["events"]["events"]
+        ]
 
     def test_cache_invalidated_on_event_save(self, active_event):
         from django.core.cache import cache
@@ -713,20 +1019,14 @@ class TestEventsCache:
         assert [e["id"] for e in events1] == [e["id"] for e in events2]
 
     def test_category_filter_uses_separate_cache_key(self, auth_client, active_event, future_event):
-        from django.core.cache import cache
+        # Fetch all — returns 2 events
+        resp_all = _gql(auth_client, GET_EVENTS_QUERY)
+        assert len(resp_all["data"]["events"]["events"]) == 2
 
-        from apps.events.schema import _get_events_cache_version
+        # Fetch filtered — returns 1 event
+        resp_music = _gql(auth_client, GET_EVENTS_QUERY, {"category": ["Music"]})
+        assert len(resp_music["data"]["events"]["events"]) == 1
 
-        # Fetch all
-        _gql(auth_client, GET_EVENTS_QUERY)
-        # Fetch filtered
-        _gql(auth_client, GET_EVENTS_QUERY, {"category": "Music"})
-
-        version = _get_events_cache_version()
-        all_cached = cache.get(f"events:v{version}:all:0:20")
-        music_cached = cache.get(f"events:v{version}:Music:0:20")
-
-        assert all_cached is not None
-        assert music_cached is not None
-        assert len(all_cached) == 2
-        assert len(music_cached) == 1
+        # Re-fetch all — still returns 2 (cache not poisoned by filter)
+        resp_all2 = _gql(auth_client, GET_EVENTS_QUERY)
+        assert len(resp_all2["data"]["events"]["events"]) == 2

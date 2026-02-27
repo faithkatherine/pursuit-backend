@@ -17,6 +17,7 @@ class Event(models.Model):
     location_name = models.CharField(max_length=255, null=True, blank=True)
     location = models.PointField(null=True, blank=True, geography=True, srid=4326)
     more_details_url = models.URLField(null=True, blank=True)
+    is_free = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -37,6 +38,7 @@ class Event(models.Model):
             models.Index(fields=["date"]),
             models.Index(fields=["location"]),
             models.Index(fields=["is_active", "date"]),
+            models.Index(fields=["is_free", "date"]),
         ]
 
 

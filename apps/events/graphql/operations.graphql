@@ -32,10 +32,32 @@ query GetEvents {
 }
 
 """
-Get events with pagination
+Get events with pagination and filters
 """
-query EventsWithPagination($offset: Int, $limit: Int, $category: String) {
-  Events(offset: $offset, limit: $limit, category: $category) {
+query EventsWithFilters(
+  $search: String,
+  $category: [String],
+  $dateFrom: DateTime,
+  $dateTo: DateTime,
+  $latitude: Float,
+  $longitude: Float,
+  $radiusKm: Float,
+  $isFree: Boolean,
+  $offset: Int,
+  $limit: Int
+) {
+  Events(
+    search: $search,
+    category: $category,
+    dateFrom: $dateFrom,
+    dateTo: $dateTo,
+    latitude: $latitude,
+    longitude: $longitude,
+    radiusKm: $radiusKm,
+    isFree: $isFree,
+    offset: $offset,
+    limit: $limit
+  ) {
     ok
     events {
       id
@@ -54,6 +76,8 @@ query EventsWithPagination($offset: Int, $limit: Int, $category: String) {
       coordinates
       moreDetailsUrl
       isActive
+      isFree
+      isSaved
     }
   }
 }
@@ -61,8 +85,8 @@ query EventsWithPagination($offset: Int, $limit: Int, $category: String) {
 """
 Get events - minimal fields (for list/card views)
 """
-query EventsMinimal($offset: Int, $limit: Int) {
-  Events(offset: $offset, limit: $limit) {
+query EventsMinimal($search: String, $category: [String], $isFree: Boolean, $offset: Int, $limit: Int) {
+  Events(search: $search, category: $category, isFree: $isFree, offset: $offset, limit: $limit) {
     ok
     events {
       id
@@ -70,6 +94,7 @@ query EventsMinimal($offset: Int, $limit: Int) {
       image
       date
       locationName
+      isFree
       category {
         name
         icon
@@ -81,8 +106,8 @@ query EventsMinimal($offset: Int, $limit: Int) {
 """
 Get events - with location data (for map views)
 """
-query EventsForMap($offset: Int, $limit: Int) {
-  Events(offset: $offset, limit: $limit) {
+query EventsForMap($latitude: Float, $longitude: Float, $radiusKm: Float, $category: [String], $offset: Int, $limit: Int) {
+  Events(latitude: $latitude, longitude: $longitude, radiusKm: $radiusKm, category: $category, offset: $offset, limit: $limit) {
     ok
     events {
       id
@@ -91,6 +116,7 @@ query EventsForMap($offset: Int, $limit: Int) {
       locationName
       coordinates
       image
+      isFree
     }
   }
 }
@@ -120,6 +146,8 @@ query Event($id: ID!) {
       coordinates
       moreDetailsUrl
       isActive
+      isFree
+      isSaved
     }
   }
 }
@@ -136,6 +164,7 @@ query EventMinimal($id: ID!) {
       image
       date
       locationName
+      isFree
       category {
         name
         icon
@@ -204,6 +233,7 @@ query SavedEvents {
       coordinates
       moreDetailsUrl
       isActive
+      isFree
       isSaved
     }
   }

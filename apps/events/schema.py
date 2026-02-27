@@ -1,6 +1,11 @@
+import hashlib
+import json
+
 import graphene
+from django.contrib.gis.geos import Point
+from django.contrib.gis.measure import D
 from django.core.cache import cache
-from django.db.models import Exists, OuterRef
+from django.db.models import Exists, OuterRef, Q
 from graphql import GraphQLError
 
 from .models import Event, UserEvents
@@ -103,7 +108,14 @@ class EventsMutations(graphene.ObjectType):
 class EventsQueries(graphene.ObjectType):
     events = graphene.Field(
         EventsListPayload,
-        category=graphene.String(),
+        search=graphene.String(),
+        category=graphene.List(graphene.String),
+        date_from=graphene.DateTime(),
+        date_to=graphene.DateTime(),
+        latitude=graphene.Float(),
+        longitude=graphene.Float(),
+        radius_km=graphene.Float(),
+        is_free=graphene.Boolean(),
         offset=graphene.Int(),
         limit=graphene.Int(),
     )
@@ -117,19 +129,61 @@ class EventsQueries(graphene.ObjectType):
         limit=graphene.Int(),
     )
 
-    def resolve_events(self, info, category=None, offset=0, limit=20):
+    def resolve_events(
+        self,
+        info,
+        search=None,
+        category=None,
+        date_from=None,
+        date_to=None,
+        latitude=None,
+        longitude=None,
+        radius_km=None,
+        is_free=None,
+        offset=0,
+        limit=20,
+    ):
         user = info.context.user
         offset = max(0, offset)
         limit = max(1, min(limit, MAX_LIMIT))
 
         version = _get_events_cache_version()
-        cache_key = f"events:v{version}:{category or 'all'}:{offset}:{limit}"
+        filter_params = {
+            "search": search,
+            "category": sorted(category) if category else [],
+            "dateFrom": str(date_from),
+            "dateTo": str(date_to),
+            "latitude": latitude,
+            "longitude": longitude,
+            "radiusKm": radius_km,
+            "isFree": is_free,
+        }
+        params_hash = hashlib.md5(
+            json.dumps(filter_params, sort_keys=True, default=str).encode()
+        ).hexdigest()[:12]
+        cache_key = f"events:v{version}:{params_hash}:{offset}:{limit}"
         event_ids = cache.get(cache_key)
 
         if event_ids is None:
             qs = Event.objects.filter(is_active=True)
+
+            if search:
+                qs = qs.filter(
+                    Q(name__icontains=search) | Q(description__icontains=search)
+                )
             if category:
-                qs = qs.filter(category__name__iexact=category)
+                qs = qs.filter(category__name__in=category).distinct()
+            if date_from:
+                qs = qs.filter(date__gte=date_from)
+            if date_to:
+                qs = qs.filter(date__lte=date_to)
+            if latitude is not None and longitude is not None:
+                radius = radius_km if radius_km is not None else 50
+                point = Point(longitude, latitude, srid=4326)
+                qs = qs.filter(location__dwithin=(point, D(km=radius)))
+            if is_free is not None:
+                qs = qs.filter(is_free=is_free)
+
             events = list(qs[offset : offset + limit])
             event_ids = [e.pk for e in events]
             cache.set(cache_key, event_ids, EVENTS_CACHE_TTL)

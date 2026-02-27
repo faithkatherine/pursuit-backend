@@ -2,9 +2,21 @@
 
 type Query {
   """
-  Get a paginated list of active events
+  Get a paginated list of active events with optional search and filters.
+  All filters combine with AND logic.
   """
-  Events(offset: Int, limit: Int, category: String): EventsListPayload!
+  Events(
+    search: String
+    category: [String]
+    dateFrom: DateTime
+    dateTo: DateTime
+    latitude: Float
+    longitude: Float
+    radiusKm: Float
+    isFree: Boolean
+    offset: Int
+    limit: Int
+  ): EventsListPayload!
 
   """
   Get a single active event by ID. Returns error for non-existent or inactive events.

@@ -18,6 +18,7 @@ type Event {
   createdAt: DateTime!
   updatedAt: DateTime!
   isActive: Boolean!
+  isFree: Boolean!
   isSaved: Boolean!
 }
 
