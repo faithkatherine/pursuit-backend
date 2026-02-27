@@ -28,6 +28,7 @@ def _annotate_is_saved(queryset, user):
 
 
 def _get_events_cache_version():
+    """Return the current cache version, initializing to 1 if unset."""
     version = cache.get(EVENTS_CACHE_VERSION_KEY)
     if version is None:
         cache.set(EVENTS_CACHE_VERSION_KEY, 1)
@@ -36,16 +37,22 @@ def _get_events_cache_version():
 
 
 class EventsListPayload(graphene.ObjectType):
+    """Response payload for paginated event list queries."""
+
     ok = graphene.Boolean(required=True)
     events = graphene.List(graphene.NonNull(EventType), required=True)
 
 
 class EventPayload(graphene.ObjectType):
+    """Response payload for single event queries."""
+
     ok = graphene.Boolean(required=True)
     event = graphene.Field(EventType)
 
 
 class SaveEventPayload(graphene.ObjectType):
+    """Response payload for save/unsave event mutations."""
+
     ok = graphene.Boolean(required=True)
     event = graphene.Field(EventType)
     errors = graphene.List(graphene.NonNull(graphene.String))
@@ -101,11 +108,15 @@ class UnsaveEventMutation(graphene.Mutation):
 
 
 class EventsMutations(graphene.ObjectType):
+    """Mutations for saving and unsaving events."""
+
     save_event = SaveEventMutation.Field()
     unsave_event = UnsaveEventMutation.Field()
 
 
 class EventsQueries(graphene.ObjectType):
+    """Queries for listing, searching, and retrieving events."""
+
     events = graphene.Field(
         EventsListPayload,
         search=graphene.String(),
@@ -143,6 +154,11 @@ class EventsQueries(graphene.ObjectType):
         offset=0,
         limit=20,
     ):
+        """Return a paginated list of active events with optional filters.
+
+        All filters combine with AND logic. Results are cached by a hash of
+        the filter parameters and invalidated when the cache version increments.
+        """
         user = info.context.user
         offset = max(0, offset)
         limit = max(1, min(limit, MAX_LIMIT))
@@ -206,6 +222,7 @@ class EventsQueries(graphene.ObjectType):
         return EventsListPayload(ok=True, events=events)
 
     def resolve_saved_events(self, info, offset=0, limit=20):
+        """Return the authenticated user's saved events, ordered by most recently saved."""
         user = info.context.user
         if not user.is_authenticated:
             raise GraphQLError("Authentication required.")
@@ -227,6 +244,7 @@ class EventsQueries(graphene.ObjectType):
         return EventsListPayload(ok=True, events=list(qs[offset : offset + limit]))
 
     def resolve_event(self, info, id):
+        """Return a single active event by ID. Raises GraphQLError if not found or inactive."""
         try:
             event = Event.objects.prefetch_related("category").get(pk=id)
         except Event.DoesNotExist:
