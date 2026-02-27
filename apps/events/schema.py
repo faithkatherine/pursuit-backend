@@ -1,5 +1,6 @@
 import graphene
 from django.core.cache import cache
+from django.db.models import Exists, OuterRef
 from graphql import GraphQLError
 
 from .models import Event, UserEvents
@@ -8,6 +9,17 @@ from .types import EventType
 
 MAX_LIMIT = 100
 EVENTS_CACHE_TTL = 300  # 5 minutes
+
+
+def _annotate_is_saved(queryset, user):
+    """Annotate each event with _is_saved for the given user (single query, no N+1)."""
+    if not user.is_authenticated:
+        return queryset
+    return queryset.annotate(
+        _is_saved=Exists(
+            UserEvents.objects.filter(user=user, event=OuterRef("pk"))
+        )
+    )
 
 
 def _get_events_cache_version():
@@ -99,9 +111,14 @@ class EventsQueries(graphene.ObjectType):
         EventPayload,
         id=graphene.ID(required=True),
     )
-    saved_events = graphene.Field(EventsListPayload)
+    saved_events = graphene.Field(
+        EventsListPayload,
+        offset=graphene.Int(),
+        limit=graphene.Int(),
+    )
 
     def resolve_events(self, info, category=None, offset=0, limit=20):
+        user = info.context.user
         offset = max(0, offset)
         limit = max(1, min(limit, MAX_LIMIT))
 
@@ -122,21 +139,38 @@ class EventsQueries(graphene.ObjectType):
             id_order = {pk: i for i, pk in enumerate(event_ids)}
             events.sort(key=lambda e: id_order[e.pk])
 
+        # Annotate is_saved in a single query instead of N+1
+        if user.is_authenticated and events:
+            saved_ids = set(
+                UserEvents.objects.filter(
+                    user=user, event_id__in=[e.pk for e in events]
+                ).values_list("event_id", flat=True)
+            )
+            for event in events:
+                event._is_saved = event.pk in saved_ids
+
         return EventsListPayload(ok=True, events=events)
 
-    def resolve_saved_events(self, info):
-        if not info.context.user.is_authenticated:
+    def resolve_saved_events(self, info, offset=0, limit=20):
+        user = info.context.user
+        if not user.is_authenticated:
             raise GraphQLError("Authentication required.")
 
-        saved = (
-            Event.objects.filter(
-                user_interactions__user=info.context.user,
-                is_active=True,
+        offset = max(0, offset)
+        limit = max(1, min(limit, MAX_LIMIT))
+
+        qs = (
+            _annotate_is_saved(
+                Event.objects.filter(
+                    user_interactions__user=user,
+                    is_active=True,
+                ),
+                user,
             )
             .prefetch_related("category")
             .order_by("-user_interactions__created_at")
         )
-        return EventsListPayload(ok=True, events=list(saved))
+        return EventsListPayload(ok=True, events=list(qs[offset : offset + limit]))
 
     def resolve_event(self, info, id):
         try:

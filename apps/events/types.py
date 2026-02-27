@@ -29,6 +29,10 @@ class EventType(DjangoObjectType):
         )
 
     def resolve_is_saved(self, info):
+        # Use annotation from queryset if available (no extra query)
+        if hasattr(self, "_is_saved"):
+            return self._is_saved
+        # Fallback for single-event lookups
         user = info.context.user
         if not user.is_authenticated:
             return False

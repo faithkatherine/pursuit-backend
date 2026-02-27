@@ -251,12 +251,26 @@ UNSAVE_EVENT_MUTATION = """
 """
 
 SAVED_EVENTS_QUERY = """
-    query {
-        savedEvents {
+    query SavedEvents($offset: Int, $limit: Int) {
+        savedEvents(offset: $offset, limit: $limit) {
             ok
             events {
                 id
                 name
+                isSaved
+            }
+        }
+    }
+"""
+
+GET_EVENTS_WITH_SAVED_QUERY = """
+    query GetEvents($offset: Int, $limit: Int) {
+        events(offset: $offset, limit: $limit) {
+            ok
+            events {
+                id
+                name
+                isSaved
             }
         }
     }
@@ -527,6 +541,106 @@ class TestSavedEventsQuery:
         errors = resp.get("errors")
         assert errors is not None
         assert "Authentication required." in errors[0]["message"]
+
+    def test_pagination_limit(self, auth_client, user, active_event, future_event):
+        UserEvents.objects.create(user=user, event=active_event)
+        UserEvents.objects.create(user=user, event=future_event)
+        resp = _gql(auth_client, SAVED_EVENTS_QUERY, {"limit": 1})
+        data = resp["data"]["savedEvents"]
+
+        assert data["ok"] is True
+        assert len(data["events"]) == 1
+
+    def test_pagination_offset(self, auth_client, user, active_event, future_event):
+        UserEvents.objects.create(user=user, event=active_event)
+        UserEvents.objects.create(user=user, event=future_event)
+        resp = _gql(auth_client, SAVED_EVENTS_QUERY, {"offset": 1, "limit": 10})
+        data = resp["data"]["savedEvents"]
+
+        assert len(data["events"]) == 1
+
+    def test_ordered_by_most_recently_saved(self, auth_client, user, active_event, future_event):
+        UserEvents.objects.create(user=user, event=active_event)
+        UserEvents.objects.create(user=user, event=future_event)
+        resp = _gql(auth_client, SAVED_EVENTS_QUERY)
+        data = resp["data"]["savedEvents"]
+
+        # Most recently saved should be first
+        assert data["events"][0]["name"] == "Football Match"
+        assert data["events"][1]["name"] == "Jazz Festival"
+
+    def test_default_limit_applied(self, auth_client, user, category):
+        # Create 25 events and save them all
+        events = []
+        for i in range(25):
+            e = Event.objects.create(
+                name=f"Event {i}",
+                date=timezone.now() + timedelta(days=i + 1),
+                is_active=True,
+            )
+            e.category.add(category)
+            events.append(e)
+            UserEvents.objects.create(user=user, event=e)
+
+        resp = _gql(auth_client, SAVED_EVENTS_QUERY)
+        data = resp["data"]["savedEvents"]
+
+        assert len(data["events"]) == 20  # default limit
+
+
+# ─── IS_SAVED FIELD TESTS ───────────────────────────────
+
+
+@pytest.mark.django_db
+class TestIsSavedField:
+    def test_is_saved_true_for_saved_event(self, auth_client, user, active_event):
+        UserEvents.objects.create(user=user, event=active_event)
+        resp = _gql(auth_client, GET_EVENTS_WITH_SAVED_QUERY)
+        event = resp["data"]["events"]["events"][0]
+
+        assert event["isSaved"] is True
+
+    def test_is_saved_false_for_unsaved_event(self, auth_client, active_event):
+        resp = _gql(auth_client, GET_EVENTS_WITH_SAVED_QUERY)
+        event = resp["data"]["events"]["events"][0]
+
+        assert event["isSaved"] is False
+
+    def test_is_saved_mixed_results(self, auth_client, user, active_event, future_event):
+        UserEvents.objects.create(user=user, event=active_event)
+        resp = _gql(auth_client, GET_EVENTS_WITH_SAVED_QUERY)
+        events = resp["data"]["events"]["events"]
+
+        saved_map = {e["name"]: e["isSaved"] for e in events}
+        assert saved_map["Jazz Festival"] is True
+        assert saved_map["Football Match"] is False
+
+    def test_is_saved_false_for_anonymous(self, anon_client, active_event):
+        resp = _gql(anon_client, GET_EVENTS_WITH_SAVED_QUERY)
+        event = resp["data"]["events"]["events"][0]
+
+        assert event["isSaved"] is False
+
+    def test_is_saved_on_saved_events_query(self, auth_client, user, active_event):
+        UserEvents.objects.create(user=user, event=active_event)
+        resp = _gql(auth_client, SAVED_EVENTS_QUERY)
+        event = resp["data"]["savedEvents"]["events"][0]
+
+        assert event["isSaved"] is True
+
+    def test_is_saved_on_single_event_fallback(self, auth_client, user, active_event):
+        """Single event query uses the fallback DB lookup (not annotation)."""
+        UserEvents.objects.create(user=user, event=active_event)
+        query = """
+            query GetEvent($id: ID!) {
+                event(id: $id) {
+                    ok
+                    event { id isSaved }
+                }
+            }
+        """
+        resp = _gql(auth_client, query, {"id": str(active_event.id)})
+        assert resp["data"]["event"]["event"]["isSaved"] is True
 
 
 # ─── CACHE TESTS ────────────────────────────────────────
