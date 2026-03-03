@@ -52,10 +52,8 @@ def verify_google_token(token):
                 "picture": idinfo.get("picture", ""),
             }
         except ValueError:
-            # Try next client ID
             continue
 
-    # Token is invalid for all client IDs
     return None
 
 
