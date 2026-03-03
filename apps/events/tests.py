@@ -1090,3 +1090,163 @@ class TestEventsPerformance:
 
         assert resp["data"]["events"]["ok"] is True
         assert elapsed < 2.0, f"Query took {elapsed:.2f}s, expected < 2s"
+
+
+# ─── ADMIN TESTS ────────────────────────────────────────
+
+
+@pytest.fixture
+def staff_user(db):
+    return User.objects.create_superuser(
+        email="admin@example.com",
+        password="adminpass123",
+        username="adminuser",
+        first_name="Admin",
+    )
+
+
+@pytest.fixture
+def admin_client(staff_user):
+    client = Client(enforce_csrf_checks=False)
+    client.force_login(staff_user)
+    return client
+
+
+@pytest.fixture
+def non_staff_client(user):
+    client = Client()
+    client.force_login(user)
+    return client
+
+
+@pytest.mark.django_db
+class TestEventAdmin:
+    def _admin_add_url(self):
+        return "/admin/events/event/add/"
+
+    def _admin_list_url(self):
+        return "/admin/events/event/"
+
+    def _valid_event_data(self, category):
+        return {
+            "name": "Admin Created Event",
+            "description": "Created via admin",
+            "date_0": "2026-06-01",
+            "date_1": "18:00:00",
+            "category": [str(category.id)],
+            "is_active": "on",
+            "is_free": "",
+        }
+
+    def test_create_event_with_valid_data(self, admin_client, category):
+        data = self._valid_event_data(category)
+        resp = admin_client.post(self._admin_add_url(), data)
+
+        assert resp.status_code == 302  # redirect on success
+        assert Event.objects.filter(name="Admin Created Event").exists()
+
+    def test_created_event_appears_in_graphql(self, admin_client, auth_client, category):
+        data = self._valid_event_data(category)
+        admin_client.post(self._admin_add_url(), data)
+
+        resp = _gql(auth_client, SEARCH_EVENTS_QUERY, {"search": "Admin Created"})
+        events = resp["data"]["events"]["events"]
+
+        assert len(events) == 1
+        assert events[0]["name"] == "Admin Created Event"
+
+    def test_submit_without_name_returns_error(self, admin_client, category):
+        data = self._valid_event_data(category)
+        data["name"] = ""
+        resp = admin_client.post(self._admin_add_url(), data)
+
+        assert resp.status_code == 200  # re-renders form with errors
+        assert not Event.objects.filter(description="Created via admin").exists()
+
+    def test_submit_without_category_returns_error(self, admin_client, category):
+        data = self._valid_event_data(category)
+        data["category"] = []
+        resp = admin_client.post(self._admin_add_url(), data)
+
+        assert resp.status_code == 200  # re-renders form with errors
+        assert not Event.objects.filter(name="Admin Created Event").exists()
+
+    def test_end_date_before_start_date_returns_error(self, admin_client, category):
+        data = self._valid_event_data(category)
+        data["end_date_0"] = "2026-05-01"
+        data["end_date_1"] = "18:00:00"
+        resp = admin_client.post(self._admin_add_url(), data)
+
+        assert resp.status_code == 200
+        assert not Event.objects.filter(name="Admin Created Event").exists()
+
+    def test_only_staff_can_access_admin(self, non_staff_client):
+        resp = non_staff_client.get(self._admin_list_url())
+
+        # Non-staff redirected to admin login
+        assert resp.status_code == 302
+        assert "/admin/login/" in resp.url
+
+    def test_unauthenticated_cannot_access_admin(self):
+        client = Client()
+        resp = client.get(self._admin_list_url())
+
+        assert resp.status_code == 302
+        assert "/admin/login/" in resp.url
+
+    def test_create_event_with_image_url(self, admin_client, category):
+        data = self._valid_event_data(category)
+        data["image"] = "https://example.com/photo.jpg"
+        resp = admin_client.post(self._admin_add_url(), data)
+
+        assert resp.status_code == 302
+        event = Event.objects.get(name="Admin Created Event")
+        assert event.image == "https://example.com/photo.jpg"
+
+    def _make_test_image(self, name="test.png", fmt="PNG"):
+        from io import BytesIO
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from PIL import Image as PILImage
+
+        img = PILImage.new("RGB", (100, 100), color="red")
+        buf = BytesIO()
+        img.save(buf, format=fmt)
+        content_type = "image/png" if fmt == "PNG" else "image/jpeg"
+        return SimpleUploadedFile(name, buf.getvalue(), content_type=content_type)
+
+    def test_create_event_with_image_upload(self, admin_client, category, mocker):
+        mocker.patch(
+            "apps.events.admin.upload_image",
+            return_value="https://storage.example.com/events/test.png",
+        )
+        data = self._valid_event_data(category)
+        data["image_file"] = self._make_test_image()
+        resp = admin_client.post(self._admin_add_url(), data)
+
+        assert resp.status_code == 302
+        event = Event.objects.get(name="Admin Created Event")
+        assert event.image == "https://storage.example.com/events/test.png"
+
+    def test_image_upload_takes_priority_over_url(self, admin_client, category, mocker):
+        mocker.patch(
+            "apps.events.admin.upload_image",
+            return_value="https://storage.example.com/events/priority.jpg",
+        )
+        data = self._valid_event_data(category)
+        data["image"] = "https://example.com/should-be-overridden.jpg"
+        data["image_file"] = self._make_test_image("priority.jpg", "JPEG")
+        resp = admin_client.post(self._admin_add_url(), data)
+
+        assert resp.status_code == 302
+        event = Event.objects.get(name="Admin Created Event")
+        assert event.image == "https://storage.example.com/events/priority.jpg"
+
+    def test_create_event_with_is_free(self, admin_client, category):
+        data = self._valid_event_data(category)
+        data["is_free"] = "on"
+        resp = admin_client.post(self._admin_add_url(), data)
+
+        assert resp.status_code == 302
+        event = Event.objects.get(name="Admin Created Event")
+        assert event.is_free is True

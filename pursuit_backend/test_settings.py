@@ -28,6 +28,16 @@ class DisableMigrations:
 
 MIGRATION_MODULES = DisableMigrations()
 
+# Use simple static file storage for tests (no manifest required)
+STORAGES = {  # noqa: F405
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
+
 # Disable cache
 CACHES = {
     "default": {
