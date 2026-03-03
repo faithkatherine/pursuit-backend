@@ -7,7 +7,7 @@ type Query {
   """
   Events(
     search: String
-    category: [String]
+    category: [ID]
     dateFrom: DateTime
     dateTo: DateTime
     latitude: Float

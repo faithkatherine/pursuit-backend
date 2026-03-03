@@ -184,7 +184,7 @@ class TestUserEventsModel:
 # ─── GRAPHQL QUERY STRINGS ───────────────────────────────
 
 GET_EVENTS_QUERY = """
-    query GetEvents($offset: Int, $limit: Int, $category: [String]) {
+    query GetEvents($offset: Int, $limit: Int, $category: [ID]) {
         events(offset: $offset, limit: $limit, category: $category) {
             ok
             events {
@@ -208,7 +208,7 @@ GET_EVENTS_QUERY = """
 SEARCH_EVENTS_QUERY = """
     query SearchEvents(
         $search: String,
-        $category: [String],
+        $category: [ID],
         $dateFrom: DateTime,
         $dateTo: DateTime,
         $latitude: Float,
@@ -337,16 +337,16 @@ class TestEventsQuery:
         assert data["ok"] is True
         assert data["events"] == []
 
-    def test_filter_by_category(self, auth_client, active_event, future_event):
-        resp = _gql(auth_client, GET_EVENTS_QUERY, {"category": ["Music"]})
+    def test_filter_by_category(self, auth_client, active_event, future_event, category):
+        resp = _gql(auth_client, GET_EVENTS_QUERY, {"category": [str(category.id)]})
         data = resp["data"]["events"]
 
         assert data["ok"] is True
         assert len(data["events"]) == 1
         assert data["events"][0]["name"] == "Jazz Festival"
 
-    def test_filter_by_multiple_categories(self, auth_client, active_event, future_event):
-        resp = _gql(auth_client, GET_EVENTS_QUERY, {"category": ["Music", "Sports"]})
+    def test_filter_by_multiple_categories(self, auth_client, active_event, future_event, category, another_category):
+        resp = _gql(auth_client, GET_EVENTS_QUERY, {"category": [str(category.id), str(another_category.id)]})
         data = resp["data"]["events"]
 
         assert data["ok"] is True
@@ -431,29 +431,32 @@ class TestSearchFilter:
 
 @pytest.mark.django_db
 class TestCategoryFilter:
-    def test_single_category(self, auth_client, active_event, future_event):
-        resp = _gql(auth_client, SEARCH_EVENTS_QUERY, {"category": ["Music"]})
+    def test_single_category(self, auth_client, active_event, future_event, category):
+        resp = _gql(auth_client, SEARCH_EVENTS_QUERY, {"category": [str(category.id)]})
         events = resp["data"]["events"]["events"]
 
         assert len(events) == 1
         assert events[0]["name"] == "Jazz Festival"
 
-    def test_multiple_categories(self, auth_client, active_event, future_event):
-        resp = _gql(auth_client, SEARCH_EVENTS_QUERY, {"category": ["Music", "Sports"]})
+    def test_multiple_categories(self, auth_client, active_event, future_event, category, another_category):
+        resp = _gql(auth_client, SEARCH_EVENTS_QUERY, {"category": [str(category.id), str(another_category.id)]})
         events = resp["data"]["events"]["events"]
 
         assert len(events) == 2
 
     def test_nonexistent_category(self, auth_client, active_event):
-        resp = _gql(auth_client, SEARCH_EVENTS_QUERY, {"category": ["Nonexistent"]})
+        import uuid
+
+        fake_id = str(uuid.uuid4())
+        resp = _gql(auth_client, SEARCH_EVENTS_QUERY, {"category": [fake_id]})
         events = resp["data"]["events"]["events"]
 
         assert len(events) == 0
 
-    def test_no_duplicates_for_multi_category_event(self, auth_client, active_event, another_category):
+    def test_no_duplicates_for_multi_category_event(self, auth_client, active_event, category, another_category):
         """Event with both Music and Sports should only appear once."""
         active_event.category.add(another_category)
-        resp = _gql(auth_client, SEARCH_EVENTS_QUERY, {"category": ["Music", "Sports"]})
+        resp = _gql(auth_client, SEARCH_EVENTS_QUERY, {"category": [str(category.id), str(another_category.id)]})
         events = resp["data"]["events"]["events"]
 
         assert len(events) == 1
@@ -594,23 +597,23 @@ class TestIsFreeFilter:
 
 @pytest.mark.django_db
 class TestCombinedFilters:
-    def test_search_plus_category(self, auth_client, active_event, future_event):
+    def test_search_plus_category(self, auth_client, active_event, future_event, category):
         resp = _gql(
             auth_client,
             SEARCH_EVENTS_QUERY,
-            {"search": "Festival", "category": ["Music"]},
+            {"search": "Festival", "category": [str(category.id)]},
         )
         events = resp["data"]["events"]["events"]
 
         assert len(events) == 1
         assert events[0]["name"] == "Jazz Festival"
 
-    def test_search_plus_category_no_match(self, auth_client, active_event, future_event):
+    def test_search_plus_category_no_match(self, auth_client, active_event, future_event, another_category):
         """Search matches but category doesn't."""
         resp = _gql(
             auth_client,
             SEARCH_EVENTS_QUERY,
-            {"search": "Jazz", "category": ["Sports"]},
+            {"search": "Jazz", "category": [str(another_category.id)]},
         )
         events = resp["data"]["events"]["events"]
 
@@ -647,7 +650,7 @@ class TestCombinedFilters:
             SEARCH_EVENTS_QUERY,
             {
                 "search": "jazz",
-                "category": ["Music"],
+                "category": [str(category.id)],
                 "dateFrom": from_date,
                 "dateTo": to_date,
                 "latitude": 40.7580,
@@ -1018,15 +1021,72 @@ class TestEventsCache:
         events2 = resp2["data"]["events"]["events"]
         assert [e["id"] for e in events1] == [e["id"] for e in events2]
 
-    def test_category_filter_uses_separate_cache_key(self, auth_client, active_event, future_event):
+    def test_category_filter_uses_separate_cache_key(self, auth_client, active_event, future_event, category):
         # Fetch all — returns 2 events
         resp_all = _gql(auth_client, GET_EVENTS_QUERY)
         assert len(resp_all["data"]["events"]["events"]) == 2
 
         # Fetch filtered — returns 1 event
-        resp_music = _gql(auth_client, GET_EVENTS_QUERY, {"category": ["Music"]})
+        resp_music = _gql(auth_client, GET_EVENTS_QUERY, {"category": [str(category.id)]})
         assert len(resp_music["data"]["events"]["events"]) == 1
 
         # Re-fetch all — still returns 2 (cache not poisoned by filter)
         resp_all2 = _gql(auth_client, GET_EVENTS_QUERY)
         assert len(resp_all2["data"]["events"]["events"]) == 2
+
+
+# ─── PERFORMANCE TESTS ─────────────────────────────────
+
+
+@pytest.mark.django_db
+class TestEventsPerformance:
+    def test_query_performs_well_with_1000_events(self, auth_client, category, another_category):
+        """Events query with filters should complete within 2 seconds for 1000+ events."""
+        import time
+
+        categories = [category, another_category]
+        events = []
+        for i in range(1050):
+            events.append(
+                Event(
+                    name=f"Perf Event {i}",
+                    description=f"Description for performance event {i}",
+                    date=timezone.now() + timedelta(days=(i % 365) + 1),
+                    is_active=True,
+                    is_free=(i % 2 == 0),
+                )
+            )
+        Event.objects.bulk_create(events)
+
+        # Assign categories via through model
+        created = Event.objects.filter(name__startswith="Perf Event")
+        through_model = Event.category.through
+        through_entries = []
+        for event in created:
+            cat = categories[event.pk % 2]
+            through_entries.append(through_model(event_id=event.pk, category_id=cat.pk))
+        through_model.objects.bulk_create(through_entries)
+
+        assert Event.objects.filter(is_active=True).count() >= 1050
+
+        # Query with multiple filters
+        from_date = (timezone.now() + timedelta(days=10)).isoformat()
+        to_date = (timezone.now() + timedelta(days=200)).isoformat()
+
+        start = time.time()
+        resp = _gql(
+            auth_client,
+            SEARCH_EVENTS_QUERY,
+            {
+                "search": "performance",
+                "category": [str(category.id)],
+                "dateFrom": from_date,
+                "dateTo": to_date,
+                "isFree": True,
+                "limit": 20,
+            },
+        )
+        elapsed = time.time() - start
+
+        assert resp["data"]["events"]["ok"] is True
+        assert elapsed < 2.0, f"Query took {elapsed:.2f}s, expected < 2s"

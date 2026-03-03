@@ -120,7 +120,7 @@ class EventsQueries(graphene.ObjectType):
     events = graphene.Field(
         EventsListPayload,
         search=graphene.String(),
-        category=graphene.List(graphene.String),
+        category=graphene.List(graphene.ID),
         date_from=graphene.DateTime(),
         date_to=graphene.DateTime(),
         latitude=graphene.Float(),
@@ -188,7 +188,7 @@ class EventsQueries(graphene.ObjectType):
                     Q(name__icontains=search) | Q(description__icontains=search)
                 )
             if category:
-                qs = qs.filter(category__name__in=category).distinct()
+                qs = qs.filter(category__id__in=category).distinct()
             if date_from:
                 qs = qs.filter(date__gte=date_from)
             if date_to:

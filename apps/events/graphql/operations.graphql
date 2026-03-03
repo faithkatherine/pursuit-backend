@@ -36,7 +36,7 @@ Get events with pagination and filters
 """
 query EventsWithFilters(
   $search: String,
-  $category: [String],
+  $category: [ID],
   $dateFrom: DateTime,
   $dateTo: DateTime,
   $latitude: Float,
@@ -85,7 +85,7 @@ query EventsWithFilters(
 """
 Get events - minimal fields (for list/card views)
 """
-query EventsMinimal($search: String, $category: [String], $isFree: Boolean, $offset: Int, $limit: Int) {
+query EventsMinimal($search: String, $category: [ID], $isFree: Boolean, $offset: Int, $limit: Int) {
   Events(search: $search, category: $category, isFree: $isFree, offset: $offset, limit: $limit) {
     ok
     events {
@@ -106,7 +106,7 @@ query EventsMinimal($search: String, $category: [String], $isFree: Boolean, $off
 """
 Get events - with location data (for map views)
 """
-query EventsForMap($latitude: Float, $longitude: Float, $radiusKm: Float, $category: [String], $offset: Int, $limit: Int) {
+query EventsForMap($latitude: Float, $longitude: Float, $radiusKm: Float, $category: [ID], $offset: Int, $limit: Int) {
   Events(latitude: $latitude, longitude: $longitude, radiusKm: $radiusKm, category: $category, offset: $offset, limit: $limit) {
     ok
     events {
