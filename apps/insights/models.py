@@ -12,6 +12,7 @@ class WeatherData(TimeStampedModel):
     city = models.CharField(max_length=100)
     condition = models.CharField(max_length=100)
     temperature = models.FloatField()
+    icon = models.CharField(max_length=10, blank=True, default="01d")
     latitude = models.DecimalField(max_digits=10, decimal_places=8, blank=True, null=True)
     longitude = models.DecimalField(max_digits=11, decimal_places=8, blank=True, null=True)
 

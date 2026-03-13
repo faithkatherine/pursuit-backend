@@ -4,7 +4,8 @@ from apps.buckets.models import BucketItem
 from apps.core.models import Category
 from apps.recommendations.models import Recommendation
 
-from .models import HomeData, UserInsight, WeatherData
+from .models import HomeData, UserInsight
+from .services import fetch_weather_for_city, fetch_weather_for_coordinates
 
 
 class WeatherType(graphene.ObjectType):
@@ -13,6 +14,7 @@ class WeatherType(graphene.ObjectType):
     city = graphene.String()
     condition = graphene.String()
     temperature = graphene.Float()
+    icon = graphene.String()
 
 
 class DestinationType(graphene.ObjectType):
@@ -49,9 +51,32 @@ class HomeDataType(graphene.ObjectType):
     time_of_day = graphene.String()
     weather = graphene.Field(WeatherType)
     insights = graphene.Field(InsightsDataType)
+    profile_picture = graphene.String()
+    user_location = graphene.String()
     bucket_categories = graphene.List("apps.core.schema.CategoryType")
     recommendations = graphene.List("apps.recommendations.schema.RecommendationType")
     upcoming = graphene.List("apps.buckets.schema.BucketItemType")
+
+
+def _get_weather_for_user(user):
+    """Resolve weather using coordinates → city name → fallback chain."""
+    profile = getattr(user, "profile", None)
+    if profile and profile.has_location:
+        lat, lon = profile.coordinates
+        city_hint = profile.location_name or ""
+        return fetch_weather_for_coordinates(lat, lon, city_hint)
+    if profile and profile.location_name:
+        return fetch_weather_for_city(profile.location_name)
+    return fetch_weather_for_city("New York")
+
+
+def _weather_to_type(weather):
+    return WeatherType(
+        city=weather.city,
+        condition=weather.condition,
+        temperature=weather.temperature,
+        icon=weather.icon,
+    )
 
 
 class InsightsQueries(graphene.ObjectType):
@@ -68,14 +93,11 @@ class InsightsQueries(graphene.ObjectType):
         # Get or create user insight
         insight, created = UserInsight.objects.get_or_create(user=user)
 
-        # Get weather data (mock for now)
-        weather = WeatherData.objects.filter(city=insight.current_city or "New York").first()
-        if not weather:
-            weather = WeatherData(city="New York", condition="Sunny", temperature=72)
+        weather = _get_weather_for_user(user)
 
         return InsightsDataType(
             id=str(insight.id),
-            weather=WeatherType(city=weather.city, condition=weather.condition, temperature=weather.temperature),
+            weather=_weather_to_type(weather),
             next_destination=DestinationType(
                 location=insight.next_destination or "Paris, France", days_away=insight.days_to_next_trip or 45
             ),
@@ -99,19 +121,21 @@ class InsightsQueries(graphene.ObjectType):
         # Get insight data
         insight, created = UserInsight.objects.get_or_create(user=user)
 
-        # Get weather data
-        weather = WeatherData.objects.filter(city=insight.current_city or "New York").first()
-        if not weather:
-            weather = WeatherData(city="New York", condition="Sunny", temperature=72)
+        weather = _get_weather_for_user(user)
+        weather_type = _weather_to_type(weather)
+
+        profile = getattr(user, "profile", None)
 
         return HomeDataType(
             id=str(home_data.id),
             greeting=f"Hello, {user.first_name}",
             time_of_day=home_data.time_of_day,
-            weather=WeatherType(city=weather.city, condition=weather.condition, temperature=weather.temperature),
+            weather=weather_type,
+            profile_picture=user.profile_picture or "",
+            user_location=profile.location_name if profile else "",
             insights=InsightsDataType(
                 id=str(insight.id),
-                weather=WeatherType(city=weather.city, condition=weather.condition, temperature=weather.temperature),
+                weather=weather_type,
                 next_destination=DestinationType(
                     location=insight.next_destination or "Paris, France", days_away=insight.days_to_next_trip or 45
                 ),
