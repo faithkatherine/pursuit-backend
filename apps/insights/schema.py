@@ -1,10 +1,8 @@
 import graphene
 
-from apps.buckets.models import BucketItem
 from apps.core.models import Category
-from apps.recommendations.models import Recommendation
+from apps.recommendations.services import get_recommended_events, get_trending_events
 
-from .models import HomeData, UserInsight
 from .services import fetch_weather_for_city, fetch_weather_for_coordinates
 
 
@@ -17,32 +15,6 @@ class WeatherType(graphene.ObjectType):
     icon = graphene.String()
 
 
-class DestinationType(graphene.ObjectType):
-    """GraphQL Destination type"""
-
-    location = graphene.String()
-    days_away = graphene.Int()
-
-
-class ProgressType(graphene.ObjectType):
-    """GraphQL Progress type"""
-
-    remaining = graphene.Int()
-    completed = graphene.Int()
-    yearly_goal = graphene.Int()
-    percentage = graphene.Int()
-
-
-class InsightsDataType(graphene.ObjectType):
-    """GraphQL InsightsData type"""
-
-    id = graphene.String()
-    weather = graphene.Field(WeatherType)
-    next_destination = graphene.Field(DestinationType)
-    progress = graphene.Field(ProgressType)
-    recent_achievement = graphene.String()
-
-
 class HomeDataType(graphene.ObjectType):
     """GraphQL HomeData type"""
 
@@ -50,16 +22,17 @@ class HomeDataType(graphene.ObjectType):
     greeting = graphene.String()
     time_of_day = graphene.String()
     weather = graphene.Field(WeatherType)
-    insights = graphene.Field(InsightsDataType)
     profile_picture = graphene.String()
     user_location = graphene.String()
-    bucket_categories = graphene.List("apps.core.schema.CategoryType")
-    recommendations = graphene.List("apps.recommendations.schema.RecommendationType")
-    upcoming = graphene.List("apps.buckets.schema.BucketItemType")
+    categories = graphene.List("apps.core.schema.CategoryType")
+    recommendations = graphene.List("apps.events.types.EventType")
+    trending = graphene.List("apps.events.types.EventType")
+    upcoming_events = graphene.List("apps.events.types.EventType")
+    active_trip = graphene.Field("apps.itinerary.types.TripType")
 
 
 def _get_weather_for_user(user):
-    """Resolve weather using coordinates → city name → fallback chain."""
+    """Resolve weather using coordinates -> city name -> fallback chain."""
     profile = getattr(user, "profile", None)
     if profile and profile.has_location:
         lat, lon = profile.coordinates
@@ -79,77 +52,90 @@ def _weather_to_type(weather):
     )
 
 
+def _get_time_of_day():
+    """Return time of day string based on current hour."""
+    from django.utils import timezone
+
+    hour = timezone.localtime().hour
+    if hour < 12:
+        return "morning"
+    elif hour < 17:
+        return "afternoon"
+    return "evening"
+
+
 class InsightsQueries(graphene.ObjectType):
     """Insights GraphQL queries"""
 
-    get_insights_data = graphene.Field(InsightsDataType)
     get_home = graphene.Field(HomeDataType, offset=graphene.Int(), limit=graphene.Int())
-
-    def resolve_get_insights_data(self, info):
-        user = info.context.user
-        if not user.is_authenticated:
-            return None
-
-        # Get or create user insight
-        insight, created = UserInsight.objects.get_or_create(user=user)
-
-        weather = _get_weather_for_user(user)
-
-        return InsightsDataType(
-            id=str(insight.id),
-            weather=_weather_to_type(weather),
-            next_destination=DestinationType(
-                location=insight.next_destination or "Paris, France", days_away=insight.days_to_next_trip or 45
-            ),
-            progress=ProgressType(
-                remaining=insight.remaining_items,
-                completed=insight.completed_items,
-                yearly_goal=insight.yearly_goal,
-                percentage=insight.progress_percentage,
-            ),
-            recent_achievement=insight.recent_achievement or "Visited 3 new cities this month!",
-        )
 
     def resolve_get_home(self, info, offset=0, limit=10):
         user = info.context.user
         if not user.is_authenticated:
             return None
 
-        # Get home data
-        home_data, created = HomeData.objects.get_or_create(user=user)
-
-        # Get insight data
-        insight, created = UserInsight.objects.get_or_create(user=user)
-
         weather = _get_weather_for_user(user)
         weather_type = _weather_to_type(weather)
 
         profile = getattr(user, "profile", None)
 
+        # Get personalized event recommendations
+        rec_results = get_recommended_events(user, offset=0, limit=5)
+        recommendations = []
+        for event, reason, source in rec_results:
+            event._reason = reason
+            event._source = source
+            event._is_saved = False
+            recommendations.append(event)
+
+        # Get trending events (popularity-based, not personalized)
+        trending_results = get_trending_events(user, limit=5)
+        trending = []
+        for event, reason, source in trending_results:
+            event._reason = reason
+            event._source = source
+            event._is_saved = False
+            trending.append(event)
+
+        # Get user's upcoming saved events (soonest 3 future events)
+        from django.utils import timezone
+        from apps.events.models import Event, UserEvents
+        from apps.itinerary.models import Trip
+
+        now = timezone.now()
+        saved_event_ids = UserEvents.objects.filter(user=user).values_list(
+            "event_id", flat=True
+        )
+        upcoming = list(
+            Event.objects.filter(
+                id__in=saved_event_ids,
+                is_active=True,
+                date__gte=now,
+            )
+            .prefetch_related("category")
+            .order_by("date")[:3]
+        )
+        for event in upcoming:
+            event._is_saved = True
+
+        # Get user's next upcoming trip
+        active_trip = (
+            Trip.objects.filter(user=user, end_date__gte=now)
+            .prefetch_related("events")
+            .order_by("start_date")
+            .first()
+        )
+
         return HomeDataType(
-            id=str(home_data.id),
+            id=str(user.id),
             greeting=f"Hello, {user.first_name}",
-            time_of_day=home_data.time_of_day,
+            time_of_day=_get_time_of_day(),
             weather=weather_type,
             profile_picture=user.profile_picture or "",
             user_location=profile.location_name if profile else "",
-            insights=InsightsDataType(
-                id=str(insight.id),
-                weather=weather_type,
-                next_destination=DestinationType(
-                    location=insight.next_destination or "Paris, France", days_away=insight.days_to_next_trip or 45
-                ),
-                progress=ProgressType(
-                    remaining=insight.remaining_items,
-                    completed=insight.completed_items,
-                    yearly_goal=insight.yearly_goal,
-                    percentage=insight.progress_percentage,
-                ),
-                recent_achievement=insight.recent_achievement or "Visited 3 new cities this month!",
-            ),
-            bucket_categories=Category.objects.filter(is_active=True)[:6],
-            recommendations=Recommendation.objects.filter(is_active=True, is_featured=True)[:5],
-            upcoming=BucketItem.objects.filter(
-                bucket_list__user=user, is_completed=False, target_date__isnull=False
-            ).order_by("target_date")[:5],
+            categories=Category.objects.filter(is_active=True)[:6],
+            recommendations=recommendations,
+            trending=trending,
+            upcoming_events=upcoming,
+            active_trip=active_trip,
         )

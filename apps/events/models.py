@@ -1,5 +1,4 @@
 from django.contrib.gis.db import models
-from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
 from apps.users.models import User
@@ -61,3 +60,5 @@ class UserEvents(models.Model):
 
     def __str__(self):
         return f"{self.user.email} saved {self.event.name}"
+
+

@@ -53,7 +53,7 @@ IMAGES = {
     "Food & Drink": f"{_U}1504674900247-0877df9cc836{_Q}",
     "Culture": f"{_U}1533669955142-6a73332af4db{_Q}",
     "Learning": f"{_U}1524178232363-1fb2b075b655{_Q}",
-    "Sports": f"{_U}1461896836934-bd45ba8ce684{_Q}",
+    "Sports": f"{_U}1571019614242-c5c5dee9f50b{_Q}",
     "Music & Events": f"{_U}1459749411175-04bf5292ceea{_Q}",
     "Nature": f"{_U}1441974231531-c6227db76b6e{_Q}",
 }

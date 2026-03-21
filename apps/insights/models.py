@@ -73,20 +73,3 @@ class UserInsight(TimeStampedModel):
     def remaining_items(self):
         """Calculate remaining items to reach yearly goal"""
         return max(0, self.yearly_goal - self.completed_items)
-
-
-class HomeData(TimeStampedModel):
-    """Home dashboard data"""
-
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="home_data")
-    greeting = models.CharField(max_length=100, default="Hello")
-    time_of_day = models.CharField(max_length=20, default="morning")
-
-    class Meta:
-        db_table = "insights_home_data"
-        verbose_name = "Home Data"
-        verbose_name_plural = "Home Data"
-        unique_together = ["user"]
-
-    def __str__(self):
-        return f"Home data for {self.user.first_name}"

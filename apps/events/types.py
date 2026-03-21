@@ -9,6 +9,8 @@ class EventType(DjangoObjectType):
 
     coordinates = graphene.List(graphene.Float)
     is_saved = graphene.Boolean()
+    reason = graphene.String()
+    source = graphene.String()
 
     class Meta:
         model = Event
@@ -38,6 +40,12 @@ class EventType(DjangoObjectType):
         if not user.is_authenticated:
             return False
         return self.user_interactions.filter(user=user).exists()
+
+    def resolve_reason(self, info):
+        return getattr(self, "_reason", None)
+
+    def resolve_source(self, info):
+        return getattr(self, "_source", None)
 
     def resolve_coordinates(self, info):
         if self.location is None:

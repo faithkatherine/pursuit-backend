@@ -86,7 +86,7 @@ admin.site.register(Event, EventAdmin)
 
 class UserEventsAdmin(admin.ModelAdmin):
     list_display = ("user", "event", "created_at")
-    search_fields = ("user__username", "event__name")
+    search_fields = ("user__username", "user__email", "user__first_name", "event__name")
     list_filter = ("created_at",)
     readonly_fields = ("created_at",)
 
