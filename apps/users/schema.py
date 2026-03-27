@@ -486,6 +486,32 @@ class SkipOnboarding(graphene.Mutation):
         return SkipOnboarding(ok=True, user=user)
 
 
+class EnableLocation(graphene.Mutation):
+    """Enable or update user location from home screen (post-onboarding)"""
+
+    class Arguments:
+        location_name = graphene.String(required=True)
+        location = graphene.List(graphene.Float, required=True)
+
+    ok = graphene.Boolean()
+    user = graphene.Field(UserType)
+
+    def mutate(self, info, location_name, location):
+        user = info.context.user
+        if user.is_anonymous:
+            raise GraphQLError(message="Not authenticated", extensions={"code": "NOT_AUTHENTICATED"})
+
+        profile = user.profile
+        profile.allow_location_sharing = True
+        profile.location_name = location_name
+        if location and len(location) == 2:
+            latitude, longitude = location
+            profile.location = Point(longitude, latitude, srid=4326)
+        profile.save()
+
+        return EnableLocation(ok=True, user=user)
+
+
 # =============================================================================
 # Combined Query and Mutation Classes
 # =============================================================================
@@ -516,6 +542,7 @@ class UserMutations(graphene.ObjectType):
     """User Mutations"""
 
     complete_onboarding = CompleteOnboarding.Field()
+    enable_location = EnableLocation.Field()
     google_sign_in = GoogleSignIn.Field()
     refresh_access_token = RefreshAccessToken.Field()
     sign_in = SignIn.Field()

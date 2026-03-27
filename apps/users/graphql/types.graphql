@@ -69,6 +69,14 @@ type RefreshTokenPayload {
 }
 
 """
+Enable location response
+"""
+type EnableLocationPayload {
+  ok: Boolean!
+  user: User
+}
+
+"""
 Sign in response
 """
 type SignInPayload {
@@ -150,6 +158,10 @@ type UserProfile {
   hasSkippedOnboarding: Boolean!
   isProfilePublic: Boolean!
 
+  # Location Sharing
+  allowLocationSharing: Boolean!
+  locationName: String
+
   # Notifications
   allowEmailNotifications: Boolean!
   allowPushNotifications: Boolean!
@@ -212,6 +224,11 @@ type Query {
 # -----------------------------------------------------------------------------
 
 type Mutation {
+  """
+  Enable or update user location (post-onboarding)
+  """
+  enableLocation(locationName: String!, location: [Float]!): EnableLocationPayload!
+
   """
   Complete user onboarding
   """

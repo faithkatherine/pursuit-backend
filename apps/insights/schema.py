@@ -24,6 +24,7 @@ class HomeDataType(graphene.ObjectType):
     weather = graphene.Field(WeatherType)
     profile_picture = graphene.String()
     user_location = graphene.String()
+    allow_location_sharing = graphene.Boolean()
     categories = graphene.List("apps.core.schema.CategoryType")
     recommendations = graphene.List("apps.events.types.EventType")
     trending = graphene.List("apps.events.types.EventType")
@@ -133,6 +134,7 @@ class InsightsQueries(graphene.ObjectType):
             weather=weather_type,
             profile_picture=user.profile_picture or "",
             user_location=profile.location_name if profile else "",
+            allow_location_sharing=profile.allow_location_sharing if profile else False,
             categories=Category.objects.filter(is_active=True)[:6],
             recommendations=recommendations,
             trending=trending,

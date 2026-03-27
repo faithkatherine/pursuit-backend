@@ -76,7 +76,7 @@ class UserProfileAdmin(admin.ModelAdmin):
         (_("Profile"), {"fields": ("user", "bio", "birth_date", "phone_number")}),
         (_("Location"), {"fields": ("location_name", "location", "search_radius_km", "timezone")}),
         (_("Onboarding"), {"fields": ("has_skipped_onboarding", "is_onboarding_completed", "interests")}),
-        (_("Privacy"), {"fields": ("is_profile_public", "allow_email_notifications", "allow_push_notifications")}),
+        (_("Privacy"), {"fields": ("is_profile_public", "allow_location_sharing", "allow_email_notifications", "allow_push_notifications")}),
         (
             _("Calendar"),
             {

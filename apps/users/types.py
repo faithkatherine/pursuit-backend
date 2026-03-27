@@ -49,6 +49,7 @@ class UserProfileType(DjangoObjectType):
             "is_onboarding_completed",
             "has_skipped_onboarding",
             "is_profile_public",
+            "allow_location_sharing",
             "allow_email_notifications",
             "allow_push_notifications",
             "calendar_integrated",

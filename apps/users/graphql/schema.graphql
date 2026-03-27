@@ -6,7 +6,24 @@
 # Mutations (Alphabetical Order)
 # -----------------------------------------------------------------------------
 
-""" 
+"""
+Enable or update user location from Home screen (post-onboarding)
+Persists location name and coordinates, sets allowLocationSharing to true
+"""
+mutation EnableLocation($locationName: String!, $location: [Float]!) {
+  enableLocation(locationName: $locationName, location: $location) {
+    ok
+    user {
+      id
+      profile {
+        locationName
+        allowLocationSharing
+      }
+    }
+  }
+}
+
+"""
 Complete onboarding process
 Allows user to set preferences and profile details after initial sign up
 Accepts optional fields for location, interests, and notification settings
@@ -300,6 +317,7 @@ query User {
       isOnboardingCompleted
       hasSkippedOnboarding
       isProfilePublic
+      allowLocationSharing
       allowEmailNotifications
       allowPushNotifications
       calendarIntegrated
@@ -360,6 +378,7 @@ fragment FullProfile on UserProfileType {
   isOnboardingCompleted
   hasSkippedOnboarding
   isProfilePublic
+  allowLocationSharing
   allowEmailNotifications
   allowPushNotifications
   calendarIntegrated
