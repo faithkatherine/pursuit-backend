@@ -81,7 +81,7 @@ class InsightsQueries(graphene.ObjectType):
         profile = getattr(user, "profile", None)
 
         # Get personalized event recommendations
-        rec_results = get_recommended_events(user, offset=0, limit=5)
+        rec_results = get_recommended_events(user, offset=offset, limit=limit)
         recommendations = []
         for event, reason, source in rec_results:
             event._reason = reason
@@ -90,7 +90,7 @@ class InsightsQueries(graphene.ObjectType):
             recommendations.append(event)
 
         # Get trending events (popularity-based, not personalized)
-        trending_results = get_trending_events(user, limit=5)
+        trending_results = get_trending_events(user, limit=limit)
         trending = []
         for event, reason, source in trending_results:
             event._reason = reason
@@ -98,7 +98,7 @@ class InsightsQueries(graphene.ObjectType):
             event._is_saved = False
             trending.append(event)
 
-        # Get user's upcoming saved events (soonest 3 future events)
+        # Get user's upcoming saved events
         from django.utils import timezone
         from apps.events.models import Event, UserEvents
         from apps.itinerary.models import Trip
@@ -114,7 +114,7 @@ class InsightsQueries(graphene.ObjectType):
                 date__gte=now,
             )
             .prefetch_related("category")
-            .order_by("date")[:3]
+            .order_by("date")[:limit]
         )
         for event in upcoming:
             event._is_saved = True
