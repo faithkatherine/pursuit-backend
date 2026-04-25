@@ -1,4 +1,5 @@
 from django.contrib.gis.db import models
+from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
 from apps.users.models import User
@@ -27,7 +28,7 @@ class Event(models.Model):
     def clean(self):
         super().clean()
         if self.end_date and self.end_date < self.date:
-            raise ValidationError("End date cannot be before start date.")
+            raise ValidationError(message="End date cannot be before start date.")
 
     class Meta:
         verbose_name = "Event"
@@ -60,5 +61,3 @@ class UserEvents(models.Model):
 
     def __str__(self):
         return f"{self.user.email} saved {self.event.name}"
-
-
