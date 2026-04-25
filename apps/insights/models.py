@@ -6,6 +6,24 @@ from apps.core.models import TimeStampedModel
 User = get_user_model()
 
 
+class Neighborhood(models.Model):
+    """Neighborhoods for location-based filtering on the home feed."""
+
+    name = models.CharField(max_length=100, unique=True)
+    city = models.CharField(max_length=100, default="Nairobi")
+    latitude = models.DecimalField(max_digits=10, decimal_places=8)
+    longitude = models.DecimalField(max_digits=11, decimal_places=8)
+
+    class Meta:
+        db_table = "insights_neighborhood"
+        verbose_name = "Neighborhood"
+        verbose_name_plural = "Neighborhoods"
+        ordering = ["name"]
+
+    def __str__(self):
+        return f"{self.name}, {self.city}"
+
+
 class WeatherData(TimeStampedModel):
     """Weather data for locations"""
 

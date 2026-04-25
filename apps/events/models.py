@@ -19,6 +19,8 @@ class Event(models.Model):
     more_details_url = models.URLField(null=True, blank=True)
     is_free = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
+    curator_note = models.TextField(null=True, blank=True, help_text="Optional editorial note for featured/editor's pick events")
+    curator_name = models.CharField(max_length=100, null=True, blank=True, help_text="Attribution for the curator note, e.g. 'Pursuit team'")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

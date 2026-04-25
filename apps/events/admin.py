@@ -55,6 +55,7 @@ class EventAdmin(admin.GISModelAdmin):
         (None, {"fields": ("name", "description", "category", "date", "end_date")}),
         ("Location", {"fields": ("location_name", "location", "timezone")}),
         ("Media", {"fields": ("image_file", "image")}),
+        ("Editorial", {"fields": ("curator_note", "curator_name"), "classes": ("collapse",)}),
         ("Settings", {"fields": ("is_free", "is_active", "more_details_url")}),
         ("Timestamps", {"fields": ("created_at", "updated_at"), "classes": ("collapse",)}),
     )

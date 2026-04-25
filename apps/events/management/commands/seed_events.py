@@ -743,6 +743,63 @@ EVENTS_DATA = [
 ]
 
 
+# Curator notes for editor's picks (event name → note + curator)
+CURATOR_NOTES = {
+    "Koroga Festival Nairobi": (
+        "The one Nairobi event I never miss \u2014 arrive early for the jazz stage",
+        "Amani, Pursuit Editor",
+    ),
+    "Nairobi Restaurant Week": (
+        "Book at least three restaurants; the prix-fixe menus sell out fast",
+        "Joy, Pursuit Food Editor",
+    ),
+    "Nairobi Art Week": (
+        "Don\u2019t skip the Brush Tu studios \u2014 the open-air installations are worth the walk",
+        "Kofi, Pursuit Culture Editor",
+    ),
+    "Great Wildebeest Migration Viewing": (
+        "Book the dawn game drive. The light at 6 a.m. is unmatched",
+        "Lena, Pursuit Travel Editor",
+    ),
+    "Masai Mara Balloon Safari": (
+        "Easily the most breathtaking hour you\u2019ll spend in Kenya",
+        "Amani, Pursuit Editor",
+    ),
+}
+
+# Near-term events for "Next Up" strip testing
+# (name, description, city, categories, hours_from_now, curator_note, curator_name)
+NEAR_TERM_EVENTS = [
+    (
+        "Westlands Rooftop Sundowner",
+        "Sunset cocktails and live acoustic sets at a Westlands rooftop bar.",
+        "Nairobi",
+        ["Food & Drink", "Music & Events"],
+        8,
+        "The best sunset view in town \u2014 grab the corner table",
+        "Joy, Pursuit Food Editor",
+    ),
+    (
+        "Karen Night Market",
+        "Artisan vendors, street food, and live music at the Karen Hub.",
+        "Nairobi",
+        ["Food & Drink", "Culture"],
+        14,
+        None,
+        None,
+    ),
+    (
+        "Uhuru Gardens Yoga at Dawn",
+        "A free community yoga session at sunrise in Uhuru Gardens.",
+        "Nairobi",
+        ["Sports", "Nature"],
+        20,
+        None,
+        None,
+    ),
+]
+
+
 class Command(BaseCommand):
     help = "Seed the database with 80+ events across all categories"
 
@@ -752,8 +809,20 @@ class Command(BaseCommand):
             action="store_true",
             help="Delete all existing events before seeding",
         )
+        parser.add_argument(
+            "--scenario",
+            choices=["a", "b"],
+            default="a",
+            help="Scenario A = no trip; Scenario B = trip + events",
+        )
 
     def handle(self, *args, **options):
+        from apps.events.models import UserEvents
+        from apps.itinerary.models import Trip
+        from django.contrib.auth import get_user_model
+
+        User = get_user_model()
+
         if options["flush"]:
             count, _ = Event.objects.all().delete()
             self.stdout.write(self.style.WARNING(f"Deleted {count} existing events."))
@@ -770,6 +839,7 @@ class Command(BaseCommand):
         created_count = 0
         skipped_count = 0
 
+        # --- Seed base events ---
         for (
             name,
             description,
@@ -782,6 +852,8 @@ class Command(BaseCommand):
             end = start + timedelta(days=duration_days) if duration_days else None  # noqa: E501
             primary_cat = cat_names[0] if cat_names else "Travel"
 
+            curator_note, curator_name = CURATOR_NOTES.get(name, (None, None))
+
             event, created = Event.objects.get_or_create(
                 name=name,
                 defaults={
@@ -793,17 +865,112 @@ class Command(BaseCommand):
                     "timezone": TIMEZONES.get(city, "Africa/Nairobi"),
                     "image": IMAGES.get(primary_cat, ""),
                     "is_active": True,
+                    "curator_note": curator_note or "",
+                    "curator_name": curator_name or "",
                 },
             )
 
             if created:
-                # Set M2M categories
                 for cat_name in cat_names:
                     cat = categories.get(cat_name)
                     if cat:
                         event.category.add(cat)
                 created_count += 1
             else:
+                # Update curator fields on existing events
+                if curator_note and not event.curator_note:
+                    event.curator_note = curator_note
+                    event.curator_name = curator_name or ""
+                    event.save(update_fields=["curator_note", "curator_name"])
                 skipped_count += 1
 
-        self.stdout.write(self.style.SUCCESS(f"Seeded {created_count} events " f"({skipped_count} already existed)."))
+        # --- Seed near-term events ---
+        near_term_count = 0
+        for (
+            name,
+            description,
+            city,
+            cat_names,
+            hours_from_now,
+            curator_note,
+            curator_name,
+        ) in NEAR_TERM_EVENTS:
+            start = timezone.now() + timedelta(hours=hours_from_now)
+            primary_cat = cat_names[0] if cat_names else "Food & Drink"
+
+            event, created = Event.objects.get_or_create(
+                name=name,
+                defaults={
+                    "description": description,
+                    "date": start,
+                    "end_date": None,
+                    "location_name": city,
+                    "location": COORDS.get(city),
+                    "timezone": TIMEZONES.get(city, "Africa/Nairobi"),
+                    "image": IMAGES.get(primary_cat, ""),
+                    "is_active": True,
+                    "curator_note": curator_note or "",
+                    "curator_name": curator_name or "",
+                },
+            )
+            if created:
+                for cat_name in cat_names:
+                    cat = categories.get(cat_name)
+                    if cat:
+                        event.category.add(cat)
+                near_term_count += 1
+
+        self.stdout.write(self.style.SUCCESS(
+            f"Seeded {created_count} events ({skipped_count} already existed), "
+            f"{near_term_count} near-term events."
+        ))
+
+        # --- Scenario setup for test user ---
+        test_user = User.objects.filter(email="faithcathy12@gmail.com").first()
+        if not test_user:
+            self.stdout.write(self.style.WARNING("Test user not found — skipping scenario setup."))
+            return
+
+        scenario = options["scenario"]
+
+        # Save near-term events for the test user (so "Next Up" works)
+        for name, *_ in NEAR_TERM_EVENTS:
+            event = Event.objects.filter(name=name).first()
+            if event:
+                UserEvents.objects.get_or_create(user=test_user, event=event)
+
+        if scenario == "b":
+            # Create a trip within 30 days
+            trip_start = timezone.now() + timedelta(days=5)
+            trip_end = trip_start + timedelta(days=4)
+            trip, trip_created = Trip.objects.get_or_create(
+                user=test_user,
+                name="Nairobi Adventure",
+                defaults={
+                    "destination": "Nairobi",
+                    "start_date": trip_start,
+                    "end_date": trip_end,
+                    "cover_image": IMAGES.get("Travel", ""),
+                },
+            )
+            if trip_created:
+                self.stdout.write(self.style.SUCCESS("Created trip: Nairobi Adventure"))
+            else:
+                # Ensure dates are within 30 days
+                trip.start_date = trip_start
+                trip.end_date = trip_end
+                trip.save(update_fields=["start_date", "end_date"])
+                self.stdout.write(self.style.SUCCESS("Updated trip dates: Nairobi Adventure"))
+        elif scenario == "a":
+            # Remove any trips within 30 days
+            now = timezone.now()
+            thirty_days = now + timedelta(days=30)
+            removed = Trip.objects.filter(
+                user=test_user,
+                end_date__gte=now,
+                start_date__lte=thirty_days,
+            ).update(start_date=now + timedelta(days=60), end_date=now + timedelta(days=65))
+            if removed:
+                self.stdout.write(self.style.WARNING(f"Moved {removed} trip(s) out of 30-day window for scenario A."))
+
+        self.stdout.write(self.style.SUCCESS(f"Scenario {scenario.upper()} configured for test user."))

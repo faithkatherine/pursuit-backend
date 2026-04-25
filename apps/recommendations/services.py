@@ -24,12 +24,12 @@ CACHE_TTL = 600  # 10 minutes
 MIN_RESULTS = 3  # backfill with popular events if fewer than this
 
 
-def get_recommended_events(user, offset=0, limit=10):
+def get_recommended_events(user, offset=0, limit=10, neighborhood_id=None, date_from=None, date_to=None):
     """
     Returns a list of (Event, reason_str, source_str) tuples
     personalized for the given user.
     """
-    cache_key = f"recs:{user.id}:{offset}:{limit}"
+    cache_key = f"recs:{user.id}:{offset}:{limit}:{neighborhood_id or 'all'}:{date_from}:{date_to}"
     cached = cache.get(cache_key)
     if cached is not None:
         return cached
@@ -45,11 +45,13 @@ def get_recommended_events(user, offset=0, limit=10):
 
     # Build candidate queryset: active, future, not already saved
     candidates = (
-        Event.objects.filter(is_active=True, date__gte=now)
+        Event.objects.filter(is_active=True, date__gte=date_from or now)
         .exclude(id__in=saved_event_ids)
         .annotate(save_count=Count("user_interactions"))
         .prefetch_related("category")
     )
+    if date_to:
+        candidates = candidates.filter(date__lte=date_to)
 
     if not candidates.exists():
         cache.set(cache_key, [], CACHE_TTL)
@@ -201,12 +203,12 @@ def _determine_reason(event, event_category_ids, content_score, collab_score,
     return ("Recommended for you", "featured")
 
 
-def get_trending_events(user, limit=5):
+def get_trending_events(user, limit=5, neighborhood_id=None, date_from=None, date_to=None):
     """
     Returns a list of (Event, reason_str, source_str) tuples
     for the most popular events — purely by save_count, no personalization.
     """
-    cache_key = f"trending:{user.id}:{limit}"
+    cache_key = f"trending:{user.id}:{limit}:{neighborhood_id or 'all'}:{date_from}:{date_to}"
     cached = cache.get(cache_key)
     if cached is not None:
         return cached
@@ -219,12 +221,17 @@ def get_trending_events(user, limit=5):
         UserEvents.objects.filter(user=user).values_list("event_id", flat=True)
     )
 
-    trending = (
-        Event.objects.filter(is_active=True, date__gte=now)
+    qs = (
+        Event.objects.filter(is_active=True, date__gte=date_from or now)
         .exclude(id__in=saved_event_ids)
         .annotate(save_count=Count("user_interactions"))
         .filter(save_count__gt=0)
-        .order_by("-save_count", "date")
+    )
+    if date_to:
+        qs = qs.filter(date__lte=date_to)
+
+    trending = (
+        qs.order_by("-save_count", "date")
         .prefetch_related("category")[:limit]
     )
 

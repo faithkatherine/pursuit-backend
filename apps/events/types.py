@@ -11,6 +11,8 @@ class EventType(DjangoObjectType):
     is_saved = graphene.Boolean()
     reason = graphene.String()
     source = graphene.String()
+    curator_note = graphene.String()
+    curator_name = graphene.String()
 
     class Meta:
         model = Event
@@ -29,6 +31,8 @@ class EventType(DjangoObjectType):
             "updated_at",
             "is_active",
             "is_free",
+            "curator_note",
+            "curator_name",
         )
 
     def resolve_is_saved(self, info):
