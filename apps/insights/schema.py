@@ -8,6 +8,80 @@ from .models import Neighborhood
 from .services import fetch_weather_for_city, fetch_weather_for_coordinates
 
 
+# ---------------------------------------------------------------------------
+# Greeting helpers
+# ---------------------------------------------------------------------------
+
+_SUBTITLE_SETS = {
+    "morning": [
+        "What\u2019s on your radar today?",
+        "Pick something for later",
+        "Make today count",
+    ],
+    "afternoon": [
+        "Got plans tonight?",
+        "Find something for the evening",
+        "What\u2019s the move?",
+    ],
+    "evening": [
+        "Where to tonight?",
+        "Pick your next adventure",
+        "Something fun ahead?",
+    ],
+    "late": [
+        "Anything calling you?",
+        "Quiet plans for tomorrow?",
+    ],
+}
+
+
+def _get_time_bucket():
+    """Return a 4-part time bucket: morning / afternoon / evening / late."""
+    from django.utils import timezone
+
+    hour = timezone.localtime().hour
+    if 5 <= hour < 12:
+        return "morning"
+    if 12 <= hour < 17:
+        return "afternoon"
+    if 17 <= hour < 22:
+        return "evening"
+    return "late"
+
+
+def _get_greeting(first_name=None):
+    """Build a time-aware greeting string, e.g. 'Good morning, Faith'."""
+    bucket = _get_time_bucket()
+    name = f", {first_name}" if first_name else ""
+    if bucket == "morning":
+        return f"Good morning{name}"
+    if bucket == "afternoon":
+        return f"Good afternoon{name}"
+    if bucket == "evening":
+        return f"Good evening{name}"
+    # late
+    return f"Still up, {first_name}?" if first_name else "Still up?"
+
+
+def _get_greeting_prompt(user_id=None):
+    """Deterministic daily subtitle — stable within a day, changes day-to-day."""
+    from django.utils import timezone
+
+    bucket = _get_time_bucket()
+    options = _SUBTITLE_SETS[bucket]
+    now = timezone.localtime()
+    date_str = f"{now.year}-{now.month - 1}-{now.day}"  # month-1 to match JS Date.getMonth()
+    seed = f"{date_str}:{user_id or 'anon'}"
+    h = 0
+    for ch in seed:
+        h = (h * 31 + ord(ch)) & 0xFFFFFFFF
+        # keep within 32-bit signed range to match JS `| 0`
+        if h >= 0x80000000:
+            h -= 0x100000000
+    index = abs(h) % len(options)
+    return options[index]
+
+
 class WeatherType(graphene.ObjectType):
     """GraphQL Weather type"""
 
@@ -30,6 +104,7 @@ class HomeDataType(graphene.ObjectType):
 
     id = graphene.String()
     greeting = graphene.String()
+    greeting_prompt = graphene.String()
     time_of_day = graphene.String()
     day_of_week = graphene.String()
     city_name = graphene.String()
@@ -232,7 +307,8 @@ class InsightsQueries(graphene.ObjectType):
 
         return HomeDataType(
             id=str(user.id),
-            greeting=f"Hi {user.first_name}",
+            greeting=_get_greeting(user.first_name),
+            greeting_prompt=_get_greeting_prompt(str(user.id)),
             time_of_day=_get_time_of_day(),
             day_of_week=_get_day_of_week(),
             city_name=_get_city_name(user, active_neighborhood),
