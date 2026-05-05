@@ -175,6 +175,12 @@ class UserProfile(models.Model):
     # Location fields for geo-based recommendations
     location_name = models.CharField(max_length=100, blank=True, help_text="City, State/Country display name")
     location = models.PointField(geography=True, null=True, blank=True, srid=4326)
+    last_synced_location_tag = models.CharField(
+        max_length=100,
+        blank=True,
+        default="nairobi",
+        help_text="Derived location tag for editorial scoping (e.g., 'nairobi', 'mombasa')",
+    )
     search_radius_km = models.PositiveIntegerField(
         default=50, help_text="Default search radius for nearby events in kilometers"
     )

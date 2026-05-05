@@ -9,6 +9,7 @@ class EventType(DjangoObjectType):
 
     coordinates = graphene.List(graphene.Float)
     is_saved = graphene.Boolean()
+    is_editors_pick = graphene.Boolean()
     reason = graphene.String()
     source = graphene.String()
     curator_note = graphene.String()
@@ -31,8 +32,6 @@ class EventType(DjangoObjectType):
             "updated_at",
             "is_active",
             "is_free",
-            "curator_note",
-            "curator_name",
         )
 
     def resolve_is_saved(self, info):
@@ -50,6 +49,18 @@ class EventType(DjangoObjectType):
 
     def resolve_source(self, info):
         return getattr(self, "_source", None)
+
+    def resolve_is_editors_pick(self, info):
+        """Return True if this event is currently shown as an Editor's Pick"""
+        return getattr(self, "_is_editors_pick", False)
+
+    def resolve_curator_note(self, info):
+        """Return curator note from EditorsPick (set at query time)"""
+        return getattr(self, "_curator_note", None)
+
+    def resolve_curator_name(self, info):
+        """Return curator name from EditorsPick (set at query time)"""
+        return getattr(self, "_curator_name", None)
 
     def resolve_coordinates(self, info):
         if self.location is None:

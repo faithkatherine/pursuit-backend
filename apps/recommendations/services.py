@@ -8,9 +8,12 @@ Personalized event recommendation engine:
 """
 
 import logging
+
 from django.core.cache import cache
 from django.db.models import Count
 from django.utils import timezone
+
+from apps.events.models import Event, UserEvents
 
 logger = logging.getLogger(__name__)
 
@@ -24,32 +27,37 @@ CACHE_TTL = 600  # 10 minutes
 MIN_RESULTS = 3  # backfill with popular events if fewer than this
 
 
-def get_recommended_events(user, offset=0, limit=10, neighborhood_id=None, date_from=None, date_to=None):
+def get_recommended_events(
+    user, offset=0, limit=10, neighborhood_id=None, date_from=None, date_to=None, exclude_event_ids=None
+):
     """
     Returns a list of (Event, reason_str, source_str) tuples
     personalized for the given user.
+
+    Args:
+        exclude_event_ids: List/set of event IDs to exclude (e.g., EditorsPick already shown)
     """
-    cache_key = f"recs:{user.id}:{offset}:{limit}:{neighborhood_id or 'all'}:{date_from}:{date_to}"
+    exclude_event_ids = exclude_event_ids or []
+    exclude_key = ",".join(str(eid) for eid in sorted(exclude_event_ids)) if exclude_event_ids else "none"
+    cache_key = f"recs:{user.id}:{offset}:{limit}:{neighborhood_id or 'all'}:{date_from}:{date_to}:{exclude_key}"
     cached = cache.get(cache_key)
     if cached is not None:
         return cached
 
-    from apps.events.models import Event, UserEvents
-
     now = timezone.now()
 
     # IDs of events the user already saved
-    saved_event_ids = set(
-        UserEvents.objects.filter(user=user).values_list("event_id", flat=True)
-    )
+    saved_event_ids = set(UserEvents.objects.filter(user=user).values_list("event_id", flat=True))
 
-    # Build candidate queryset: active, future, not already saved
+    # Build candidate queryset: active, future, not already saved, not excluded
     candidates = (
         Event.objects.filter(is_active=True, date__gte=date_from or now)
         .exclude(id__in=saved_event_ids)
         .annotate(save_count=Count("user_interactions"))
         .prefetch_related("category")
     )
+    if exclude_event_ids:
+        candidates = candidates.exclude(id__in=exclude_event_ids)
     if date_to:
         candidates = candidates.filter(date__lte=date_to)
 
@@ -64,18 +72,12 @@ def get_recommended_events(user, offset=0, limit=10, neighborhood_id=None, date_
     # From onboarding interests
     if profile:
         interest_category_ids = set(
-            profile.interests.exclude(category__isnull=True).values_list(
-                "category_id", flat=True
-            )
+            profile.interests.exclude(category__isnull=True).values_list("category_id", flat=True)
         )
         user_category_ids |= interest_category_ids
 
     # From saved events
-    saved_event_category_ids = set(
-        UserEvents.objects.filter(user=user).values_list(
-            "event__category__id", flat=True
-        )
-    )
+    saved_event_category_ids = set(UserEvents.objects.filter(user=user).values_list("event__category__id", flat=True))
     user_category_ids |= saved_event_category_ids
     user_category_ids.discard(None)
 
@@ -127,26 +129,24 @@ def get_recommended_events(user, offset=0, limit=10, neighborhood_id=None, date_
         )
 
         reason, source = _determine_reason(
-            event, event_category_ids, content_score, collab_score,
-            popularity_score, user_category_ids,
+            event,
+            event_category_ids,
+            content_score,
+            collab_score,
+            popularity_score,
+            user_category_ids,
         )
 
         scored.append((event, total, reason, source))
 
     scored.sort(key=lambda x: x[1], reverse=True)
 
-    results = [
-        (event, reason, source)
-        for event, _score, reason, source in scored[offset : offset + limit]
-    ]
+    results = [(event, reason, source) for event, _score, reason, source in scored[offset : offset + limit]]
 
     # Backfill with popular events if we have fewer than target_count
     if len(results) < target_count:
         result_ids = {event.id for event, _, _ in results}
-        backfill_candidates = (
-            candidates.exclude(id__in=result_ids)
-            .order_by("-save_count", "date")
-        )
+        backfill_candidates = candidates.exclude(id__in=result_ids).order_by("-save_count", "date")
         for event in backfill_candidates[: target_count - len(results)]:
             results.append((event, "Popular near you", "popular"))
 
@@ -184,14 +184,14 @@ def _get_collaborative_event_ids(user, saved_event_ids):
     return collaborative_ids
 
 
-def _determine_reason(event, event_category_ids, content_score, collab_score,
-                      popularity_score, user_category_ids):
+def _determine_reason(event, event_category_ids, content_score, collab_score, popularity_score, user_category_ids):
     """Determine the human-readable reason and source type for a recommendation."""
     if content_score > 0:
         # Find the matching category name
         matching_ids = event_category_ids & user_category_ids
         if matching_ids:
             from apps.core.models import Category
+
             cat = Category.objects.filter(id__in=matching_ids).first()
             if cat:
                 return (f"Based on your interest in {cat.name}", "content_based")
@@ -203,12 +203,17 @@ def _determine_reason(event, event_category_ids, content_score, collab_score,
     return ("Recommended for you", "featured")
 
 
-def get_trending_events(user, limit=5, neighborhood_id=None, date_from=None, date_to=None):
+def get_trending_events(user, limit=5, neighborhood_id=None, date_from=None, date_to=None, exclude_event_ids=None):
     """
     Returns a list of (Event, reason_str, source_str) tuples
     for the most popular events — purely by save_count, no personalization.
+
+    Args:
+        exclude_event_ids: List/set of event IDs to exclude (e.g., EditorsPick already shown)
     """
-    cache_key = f"trending:{user.id}:{limit}:{neighborhood_id or 'all'}:{date_from}:{date_to}"
+    exclude_event_ids = exclude_event_ids or []
+    exclude_key = ",".join(str(eid) for eid in sorted(exclude_event_ids)) if exclude_event_ids else "none"
+    cache_key = f"trending:{user.id}:{limit}:{neighborhood_id or 'all'}:{date_from}:{date_to}:{exclude_key}"
     cached = cache.get(cache_key)
     if cached is not None:
         return cached
@@ -217,9 +222,7 @@ def get_trending_events(user, limit=5, neighborhood_id=None, date_from=None, dat
 
     now = timezone.now()
 
-    saved_event_ids = set(
-        UserEvents.objects.filter(user=user).values_list("event_id", flat=True)
-    )
+    saved_event_ids = set(UserEvents.objects.filter(user=user).values_list("event_id", flat=True))
 
     qs = (
         Event.objects.filter(is_active=True, date__gte=date_from or now)
@@ -227,13 +230,12 @@ def get_trending_events(user, limit=5, neighborhood_id=None, date_from=None, dat
         .annotate(save_count=Count("user_interactions"))
         .filter(save_count__gt=0)
     )
+    if exclude_event_ids:
+        qs = qs.exclude(id__in=exclude_event_ids)
     if date_to:
         qs = qs.filter(date__lte=date_to)
 
-    trending = (
-        qs.order_by("-save_count", "date")
-        .prefetch_related("category")[:limit]
-    )
+    trending = qs.order_by("-save_count", "date").prefetch_related("category")[:limit]
 
     results = [(event, "Trending", "trending") for event in trending]
     cache.set(cache_key, results, CACHE_TTL)

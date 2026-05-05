@@ -1,12 +1,18 @@
-import graphene
 from datetime import timedelta
 
+import graphene
+from django.utils import timezone
+
 from apps.core.models import Category
+
+# Determine effective location_tag for Editor's Pick matching
+from apps.events.locations import location_tag_from_coords
+from apps.events.models import EditorsPick, Event, UserEvents
+from apps.itinerary.models import Trip
 from apps.recommendations.services import get_recommended_events, get_trending_events
 
 from .models import Neighborhood
 from .services import fetch_weather_for_city, fetch_weather_for_coordinates
-
 
 # ---------------------------------------------------------------------------
 # Greeting helpers
@@ -37,7 +43,6 @@ _SUBTITLE_SETS = {
 
 def _get_time_bucket():
     """Return a 4-part time bucket: morning / afternoon / evening / late."""
-    from django.utils import timezone
 
     hour = timezone.localtime().hour
     if 5 <= hour < 12:
@@ -65,7 +70,6 @@ def _get_greeting(first_name=None):
 
 def _get_greeting_prompt(user_id=None):
     """Deterministic daily subtitle — stable within a day, changes day-to-day."""
-    from django.utils import timezone
 
     bucket = _get_time_bucket()
     options = _SUBTITLE_SETS[bucket]
@@ -153,7 +157,6 @@ def _weather_to_type(weather):
 
 def _get_time_of_day():
     """Return time of day string based on current hour."""
-    from django.utils import timezone
 
     hour = timezone.localtime().hour
     if hour < 12:
@@ -165,7 +168,6 @@ def _get_time_of_day():
 
 def _get_day_of_week():
     """Return current day of week name."""
-    from django.utils import timezone
 
     return timezone.localtime().strftime("%A")
 
@@ -183,7 +185,6 @@ def _get_city_name(user, neighborhood=None):
 
 def _resolve_time_filter(time_filter):
     """Translate a time_filter string into (date_from, date_to) datetimes."""
-    from django.utils import timezone
 
     now = timezone.now()
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -246,50 +247,26 @@ class InsightsQueries(graphene.ObjectType):
 
         profile = getattr(user, "profile", None)
 
-        # Get personalized event recommendations
-        rec_results = get_recommended_events(
-            user, offset=offset, limit=limit, date_from=date_from, date_to=date_to,
-        )
-        recommendations = []
-        for event, reason, source in rec_results:
-            event._reason = reason
-            event._source = source
-            event._is_saved = False
-            recommendations.append(event)
-
-        # Get trending events (popularity-based, not personalized)
-        trending_results = get_trending_events(
-            user, limit=limit, date_from=date_from, date_to=date_to,
-        )
-        trending = []
-        for event, reason, source in trending_results:
-            event._reason = reason
-            event._source = source
-            event._is_saved = False
-            trending.append(event)
-
-        # Get user's upcoming saved events
-        from django.utils import timezone
-        from apps.events.models import Event, UserEvents
-        from apps.itinerary.models import Trip
-
         now = timezone.now()
-        saved_event_ids = UserEvents.objects.filter(user=user).values_list(
-            "event_id", flat=True
-        )
-        upcoming = list(
-            Event.objects.filter(
-                id__in=saved_event_ids,
-                is_active=True,
-                date__gte=now,
-            )
-            .prefetch_related("category")
-            .order_by("date")[:limit]
-        )
-        for event in upcoming:
-            event._is_saved = True
+        effective_tag = "nairobi"  # fallback
 
-        # Get user's next upcoming trip (within ~30 days)
+        if neighborhood_id and active_neighborhood:
+            # Manual filter selected → derive from neighborhood coords
+            effective_tag = location_tag_from_coords(
+                float(active_neighborhood.latitude), float(active_neighborhood.longitude)
+            )
+        elif profile and profile.has_location:
+            # User has GPS coords → derive tag and update profile
+            lat, lon = profile.coordinates
+            effective_tag = location_tag_from_coords(lat, lon)
+            if profile.last_synced_location_tag != effective_tag:
+                profile.last_synced_location_tag = effective_tag
+                profile.save(update_fields=["last_synced_location_tag"])
+        elif profile and profile.last_synced_location_tag:
+            # Use stored tag from last sync
+            effective_tag = profile.last_synced_location_tag
+
+        # Check for active trip (takes priority over Editor's Pick)
         thirty_days = now + timedelta(days=30)
         active_trip = (
             Trip.objects.filter(
@@ -301,6 +278,89 @@ class InsightsQueries(graphene.ObjectType):
             .order_by("start_date")
             .first()
         )
+
+        # Query Editor's Pick only if no active trip
+        editors_pick = None
+        editors_pick_event_id = None
+        if not active_trip:
+            editors_pick = (
+                EditorsPick.objects.filter(
+                    location_tag=effective_tag,
+                    active_from__lte=now,
+                    active_until__gte=now,
+                    position=1,
+                )
+                .select_related("event")
+                .order_by("-active_from")
+                .first()
+            )
+            if editors_pick:
+                editors_pick_event_id = editors_pick.event.id
+
+        # Prepare exclusion list for recommendations and trending
+        exclude_event_ids = [editors_pick_event_id] if editors_pick_event_id else []
+
+        # Get personalized event recommendations (excluding EditorsPick)
+        rec_results = get_recommended_events(
+            user,
+            offset=offset,
+            limit=limit,
+            date_from=date_from,
+            date_to=date_to,
+            exclude_event_ids=exclude_event_ids,
+        )
+        recommendations = []
+
+        # If Editor's Pick exists, prepend it as the first recommendation
+        if editors_pick:
+            pick_event = editors_pick.event
+            pick_event._reason = "Editor's pick"
+            pick_event._source = "editorial"
+            pick_event._is_saved = False
+            pick_event._curator_note = editors_pick.curator_note
+            pick_event._curator_name = editors_pick.curator_name
+            pick_event._is_editors_pick = True
+            recommendations.append(pick_event)
+
+        # Add algorithm recommendations (already excludes the pick event)
+        for event, reason, source in rec_results:
+            event._reason = reason
+            event._source = source
+            event._is_saved = False
+            event._is_editors_pick = False
+            recommendations.append(event)
+
+        # Get trending events (popularity-based, excluding EditorsPick)
+        trending_results = get_trending_events(
+            user,
+            limit=limit,
+            date_from=date_from,
+            date_to=date_to,
+            exclude_event_ids=exclude_event_ids,
+        )
+        trending = []
+        for event, reason, source in trending_results:
+            event._reason = reason
+            event._source = source
+            event._is_saved = False
+            event._is_editors_pick = False
+            trending.append(event)
+
+        # Get user's upcoming saved events
+
+        now = timezone.now()
+        saved_event_ids = UserEvents.objects.filter(user=user).values_list("event_id", flat=True)
+        upcoming = list(
+            Event.objects.filter(
+                id__in=saved_event_ids,
+                is_active=True,
+                date__gte=now,
+            )
+            .prefetch_related("category")
+            .order_by("date")[:limit]
+        )
+        for event in upcoming:
+            event._is_saved = True
 
         # All available neighborhoods
         all_neighborhoods = list(Neighborhood.objects.all())

@@ -48,14 +48,14 @@ TIMEZONES = {
 _U = "https://images.unsplash.com/photo-"
 _Q = "?auto=format&fit=crop&q=80&w=800"
 IMAGES = {
-    "Travel": f"{_U}1488085061387-422e29b40080{_Q}",
-    "Adventure": f"{_U}1533692328991-08159ff19fca{_Q}",
+    "Talks & Ideas": f"{_U}1524178232363-1fb2b075b655{_Q}",
+    "Workshops & Classes": f"{_U}1524178232363-1fb2b075b655{_Q}",
+    "Concerts & Nightlife": f"{_U}1459749411175-04bf5292ceea{_Q}",
+    "Culture & Arts": f"{_U}1533669955142-6a73332af4db{_Q}",
+    "Outdoors & Active": f"{_U}1533692328991-08159ff19fca{_Q}",
     "Food & Drink": f"{_U}1504674900247-0877df9cc836{_Q}",
-    "Culture": f"{_U}1533669955142-6a73332af4db{_Q}",
-    "Learning": f"{_U}1524178232363-1fb2b075b655{_Q}",
-    "Sports": f"{_U}1571019614242-c5c5dee9f50b{_Q}",
-    "Music & Events": f"{_U}1459749411175-04bf5292ceea{_Q}",
-    "Nature": f"{_U}1441974231531-c6227db76b6e{_Q}",
+    "Markets & Pop-ups": f"{_U}1533669955142-6a73332af4db{_Q}",
+    "Travel": f"{_U}1488085061387-422e29b40080{_Q}",
 }
 
 
@@ -81,7 +81,7 @@ EVENTS_DATA = [
         "A vibrant celebration of Swahili culture with dhow races, "
         "donkey races, and traditional music on Lamu Island.",
         "Lamu",
-        ["Travel", "Culture"],
+        ["Travel", "Culture & Arts"],
         45,
         4,
     ),
@@ -97,7 +97,7 @@ EVENTS_DATA = [
         "Kenya Camping & Caravan Show",
         "Explore the latest camping gear, overland vehicles, and safari " "camping experiences across Kenya.",
         "Nairobi",
-        ["Travel", "Adventure"],
+        ["Travel", "Outdoors & Active"],
         90,
         3,
     ),
@@ -106,7 +106,7 @@ EVENTS_DATA = [
         "A week-long festival celebrating Diani's stunning beaches with "
         "kite-surfing demos, beach volleyball, and sundowner events.",
         "Diani",
-        ["Travel", "Adventure"],
+        ["Travel", "Outdoors & Active"],
         75,
         5,
     ),
@@ -122,7 +122,7 @@ EVENTS_DATA = [
         "Edinburgh Fringe Festival Travel Showcase",
         "Explore Scotland's travel offerings alongside the world's " "largest arts festival.",
         "Edinburgh",
-        ["Travel", "Culture"],
+        ["Travel", "Culture & Arts"],
         150,
         2,
     ),
@@ -134,12 +134,12 @@ EVENTS_DATA = [
         100,
         2,
     ),
-    # ── Adventure (5 Kenya, 2 UK, 1 US) ─────────────────────────────
+    # ── Outdoors & Active (5 Kenya, 2 UK, 1 US) ─────────────────────────────
     (
         "Mount Kenya Ultra Trail",
         "A grueling ultra-marathon around Mount Kenya through forests, " "moorlands, and high-altitude terrain.",
         "Nakuru",
-        ["Adventure", "Sports"],
+        ["Outdoors & Active"],
         35,
         2,
     ),
@@ -147,7 +147,7 @@ EVENTS_DATA = [
         "Hell's Gate Rock Climbing Weekend",
         "Guided rock climbing and gorge walking in Hell's Gate " "National Park near Lake Naivasha.",
         "Naivasha",
-        ["Adventure"],
+        ["Outdoors & Active"],
         20,
         2,
     ),
@@ -155,7 +155,7 @@ EVENTS_DATA = [
         "Diani Skydiving Experience",
         "Tandem skydiving over the turquoise waters of the Indian Ocean " "at Diani Beach.",
         "Diani",
-        ["Adventure"],
+        ["Outdoors & Active"],
         50,
         0,
     ),
@@ -163,7 +163,7 @@ EVENTS_DATA = [
         "Masai Mara Balloon Safari",
         "A sunrise hot air balloon ride over the Masai Mara with " "champagne bush breakfast.",
         "Nairobi",
-        ["Adventure", "Nature"],
+        ["Outdoors & Active"],
         40,
         0,
     ),
@@ -171,7 +171,7 @@ EVENTS_DATA = [
         "Tana River White Water Rafting",
         "Exciting white-water rafting on the Tana River with Class III " "and IV rapids near Sagana.",
         "Nairobi",
-        ["Adventure"],
+        ["Outdoors & Active"],
         25,
         0,
     ),
@@ -179,7 +179,7 @@ EVENTS_DATA = [
         "Lake District Adventure Weekend",
         "Kayaking, fell running, and wild camping in England's Lake " "District National Park.",
         "Manchester",
-        ["Adventure", "Nature"],
+        ["Outdoors & Active"],
         55,
         2,
     ),
@@ -187,7 +187,7 @@ EVENTS_DATA = [
         "Scottish Highlands Survival Course",
         "A wilderness survival course in the Scottish Highlands covering " "fire-making, foraging, and navigation.",
         "Edinburgh",
-        ["Adventure", "Learning"],
+        ["Outdoors & Active", "Workshops & Classes"],
         80,
         3,
     ),
@@ -195,7 +195,7 @@ EVENTS_DATA = [
         "NYC Urban Adventure Race",
         "A city-wide adventure race through New York's boroughs " "combining running, cycling, and problem-solving.",
         "New York",
-        ["Adventure", "Sports"],
+        ["Outdoors & Active"],
         65,
         0,
     ),
@@ -212,7 +212,7 @@ EVENTS_DATA = [
         "Mombasa Street Food Festival",
         "Taste the best of coastal Kenyan street food: biryani, " "viazi karai, mahamri, and fresh seafood.",
         "Mombasa",
-        ["Food & Drink", "Culture"],
+        ["Food & Drink", "Culture & Arts"],
         42,
         3,
     ),
@@ -228,7 +228,7 @@ EVENTS_DATA = [
         "Kisumu Fish Festival",
         "A lakeside celebration of Lake Victoria's fishing heritage " "with fresh tilapia and omena tastings.",
         "Kisumu",
-        ["Food & Drink", "Culture"],
+        ["Food & Drink", "Culture & Arts"],
         55,
         2,
     ),
@@ -252,7 +252,7 @@ EVENTS_DATA = [
         "Birmingham Curry Festival",
         "A celebration of Birmingham's iconic curry scene with " "cooking demos, tastings, and live music.",
         "Birmingham",
-        ["Food & Drink", "Culture"],
+        ["Food & Drink", "Culture & Arts"],
         110,
         2,
     ),
@@ -264,13 +264,13 @@ EVENTS_DATA = [
         130,
         3,
     ),
-    # ── Culture (5 Kenya, 2 UK, 1 US) ───────────────────────────────
+    # ── Culture & Arts (5 Kenya, 2 UK, 1 US) ───────────────────────────────
     (
         "Nairobi Art Week",
         "A week of gallery openings, studio tours, and public art "
         "installations across Nairobi's creative districts.",
         "Nairobi",
-        ["Culture"],
+        ["Culture & Arts"],
         22,
         7,
     ),
@@ -279,7 +279,7 @@ EVENTS_DATA = [
         "A celebration of the Suba people's traditions with dance, "
         "music, and storytelling on the shores of Lake Victoria.",
         "Kisumu",
-        ["Culture"],
+        ["Culture & Arts"],
         48,
         2,
     ),
@@ -288,7 +288,7 @@ EVENTS_DATA = [
         "Guided heritage walks through Mombasa Old Town exploring "
         "Fort Jesus, Swahili architecture, and local crafts.",
         "Mombasa",
-        ["Culture", "Learning"],
+        ["Culture & Arts", "Talks & Ideas"],
         18,
         0,
     ),
@@ -296,7 +296,7 @@ EVENTS_DATA = [
         "Nakuru Blankets & Wine",
         "An outdoor picnic-style event featuring live bands, DJs, " "and local food vendors in Nakuru's Hyrax Hill.",
         "Nakuru",
-        ["Culture", "Music & Events"],
+        ["Culture & Arts", "Concerts & Nightlife"],
         32,
         0,
     ),
@@ -304,7 +304,7 @@ EVENTS_DATA = [
         "Kenya Fashion Week",
         "Showcasing African fashion designers with runway shows, " "pop-up markets, and industry workshops.",
         "Nairobi",
-        ["Culture"],
+        ["Culture & Arts", "Markets & Pop-ups"],
         105,
         4,
     ),
@@ -312,7 +312,7 @@ EVENTS_DATA = [
         "London African Film Festival",
         "Screenings, panels, and Q&As celebrating the best of " "African cinema at BFI Southbank.",
         "London",
-        ["Culture"],
+        ["Culture & Arts"],
         140,
         10,
     ),
@@ -320,7 +320,7 @@ EVENTS_DATA = [
         "Manchester International Festival",
         "A biennial festival of original new work from across the " "arts including theatre, music, and visual art.",
         "Manchester",
-        ["Culture", "Music & Events"],
+        ["Culture & Arts", "Concerts & Nightlife"],
         160,
         18,
     ),
@@ -328,16 +328,16 @@ EVENTS_DATA = [
         "Harlem Cultural Festival NYC",
         "Celebrating Harlem's rich cultural heritage with live " "performances, art exhibits, and soul food.",
         "New York",
-        ["Culture", "Music & Events"],
+        ["Culture & Arts", "Concerts & Nightlife"],
         115,
         2,
     ),
-    # ── Learning (5 Kenya, 2 UK, 1 US) ──────────────────────────────
+    # ── Workshops & Classes / Talks & Ideas (5 Kenya, 2 UK, 1 US) ──────────────────────────────
     (
         "Nairobi Tech Week",
         "East Africa's largest tech conference with workshops on AI, " "fintech, and mobile innovation.",
         "Nairobi",
-        ["Learning"],
+        ["Workshops & Classes", "Talks & Ideas"],
         28,
         5,
     ),
@@ -345,7 +345,7 @@ EVENTS_DATA = [
         "Swahili Language Immersion Lamu",
         "A week-long Swahili language course on Lamu Island combining " "classroom learning with cultural immersion.",
         "Lamu",
-        ["Learning", "Culture"],
+        ["Workshops & Classes", "Culture & Arts"],
         60,
         7,
     ),
@@ -353,7 +353,7 @@ EVENTS_DATA = [
         "Wildlife Photography Masterclass",
         "A hands-on photography workshop in Nakuru National Park led " "by award-winning wildlife photographers.",
         "Nakuru",
-        ["Learning", "Nature"],
+        ["Workshops & Classes", "Outdoors & Active"],
         38,
         3,
     ),
@@ -362,7 +362,7 @@ EVENTS_DATA = [
         "An intensive bootcamp for aspiring entrepreneurs covering "
         "business planning, funding, and digital marketing.",
         "Kisumu",
-        ["Learning"],
+        ["Workshops & Classes"],
         72,
         5,
     ),
@@ -370,7 +370,7 @@ EVENTS_DATA = [
         "Mombasa Marine Biology Workshop",
         "Learn about coral reef conservation and marine ecosystems " "at the Kenya Marine Research Institute.",
         "Mombasa",
-        ["Learning", "Nature"],
+        ["Workshops & Classes", "Outdoors & Active"],
         88,
         3,
     ),
@@ -378,7 +378,7 @@ EVENTS_DATA = [
         "Oxford Creative Writing Retreat",
         "A weekend writing retreat at an Oxford college with sessions " "on fiction, poetry, and memoir.",
         "London",
-        ["Learning"],
+        ["Workshops & Classes"],
         125,
         2,
     ),
@@ -386,7 +386,7 @@ EVENTS_DATA = [
         "Edinburgh Science Festival",
         "Hands-on science workshops, talks, and exhibitions for " "curious minds of all ages.",
         "Edinburgh",
-        ["Learning"],
+        ["Workshops & Classes", "Talks & Ideas"],
         145,
         14,
     ),
@@ -394,16 +394,16 @@ EVENTS_DATA = [
         "Atlanta Startup Summit",
         "Workshops and mentoring sessions connecting founders with " "investors and industry leaders.",
         "Atlanta",
-        ["Learning"],
+        ["Workshops & Classes", "Talks & Ideas"],
         98,
         2,
     ),
-    # ── Sports (5 Kenya, 2 UK, 1 US) ────────────────────────────────
+    # ── Outdoors & Active - Sports (5 Kenya, 2 UK, 1 US) ────────────────────────────────
     (
         "Nairobi Marathon",
         "The annual Nairobi Marathon attracting elite runners and " "amateurs through the city's scenic routes.",
         "Nairobi",
-        ["Sports"],
+        ["Outdoors & Active"],
         44,
         0,
     ),
@@ -411,7 +411,7 @@ EVENTS_DATA = [
         "Diani Beach Triathlon",
         "Swim, cycle, and run along the stunning Diani coastline " "in this popular multi-sport event.",
         "Diani",
-        ["Sports", "Adventure"],
+        ["Outdoors & Active"],
         58,
         0,
     ),
@@ -419,7 +419,7 @@ EVENTS_DATA = [
         "Kenya Sevens Rugby Festival",
         "The electrifying Kenya Sevens rugby tournament with live " "music, food, and family entertainment.",
         "Nairobi",
-        ["Sports", "Music & Events"],
+        ["Outdoors & Active", "Concerts & Nightlife"],
         36,
         2,
     ),
@@ -427,7 +427,7 @@ EVENTS_DATA = [
         "Lewa Safari Marathon",
         "Run a marathon through a wildlife conservancy alongside " "giraffes, zebras, and elephants.",
         "Nairobi",
-        ["Sports", "Nature"],
+        ["Outdoors & Active"],
         82,
         0,
     ),
@@ -435,7 +435,7 @@ EVENTS_DATA = [
         "Kisumu Boat Race",
         "Annual boat racing on Lake Victoria with rowing, sailing, " "and traditional dhow competitions.",
         "Kisumu",
-        ["Sports"],
+        ["Outdoors & Active"],
         68,
         0,
     ),
@@ -443,7 +443,7 @@ EVENTS_DATA = [
         "London Marathon Expo",
         "The official expo for the London Marathon with gear, " "nutrition, and running workshops.",
         "London",
-        ["Sports"],
+        ["Outdoors & Active"],
         135,
         3,
     ),
@@ -451,7 +451,7 @@ EVENTS_DATA = [
         "Manchester City Football Experience",
         "Behind-the-scenes stadium tours, coaching clinics, and " "match-day experiences at the Etihad.",
         "Manchester",
-        ["Sports"],
+        ["Outdoors & Active"],
         52,
         0,
     ),
@@ -459,16 +459,16 @@ EVENTS_DATA = [
         "NYC Basketball Classic",
         "An outdoor basketball tournament in Harlem featuring " "streetball legends and rising stars.",
         "New York",
-        ["Sports"],
+        ["Outdoors & Active"],
         78,
         2,
     ),
-    # ── Music & Events (5 Kenya, 2 UK, 1 US) ────────────────────────
+    # ── Concerts & Nightlife (5 Kenya, 2 UK, 1 US) ────────────────────────
     (
         "Koroga Festival Nairobi",
         "Kenya's favourite outdoor music festival blending Afrobeats, " "jazz, and soul with gourmet food trucks.",
         "Nairobi",
-        ["Music & Events"],
+        ["Concerts & Nightlife"],
         26,
         0,
     ),
@@ -476,7 +476,7 @@ EVENTS_DATA = [
         "Sauti za Busara Mombasa Satellite",
         "A satellite edition of the Sauti za Busara music festival " "bringing East African sounds to the coast.",
         "Mombasa",
-        ["Music & Events", "Culture"],
+        ["Concerts & Nightlife", "Culture & Arts"],
         62,
         3,
     ),
@@ -484,7 +484,7 @@ EVENTS_DATA = [
         "Nakuru Jazz & Blues Night",
         "A monthly jazz and blues night featuring Kenyan and " "international musicians at Nakuru's Lake Basin.",
         "Nakuru",
-        ["Music & Events"],
+        ["Concerts & Nightlife"],
         14,
         0,
     ),
@@ -492,7 +492,7 @@ EVENTS_DATA = [
         "Malindi Beach Music Festival",
         "A beachside music festival with reggae, Afro-pop, and " "Taarab performances under the stars.",
         "Malindi",
-        ["Music & Events"],
+        ["Concerts & Nightlife"],
         92,
         2,
     ),
@@ -500,7 +500,7 @@ EVENTS_DATA = [
         "Nairobi Acoustic Sessions",
         "Intimate acoustic performances by Kenyan singer-songwriters " "at Nairobi's rooftop venues.",
         "Nairobi",
-        ["Music & Events"],
+        ["Concerts & Nightlife"],
         10,
         0,
     ),
@@ -508,7 +508,7 @@ EVENTS_DATA = [
         "Notting Hill Carnival Warm-Up",
         "Pre-carnival live music, steel pan workshops, and Caribbean " "food in West London.",
         "London",
-        ["Music & Events", "Culture"],
+        ["Concerts & Nightlife", "Culture & Arts"],
         155,
         2,
     ),
@@ -516,7 +516,7 @@ EVENTS_DATA = [
         "Edinburgh Hogmanay Concert",
         "New Year's Eve concert and fireworks celebration in " "Edinburgh's Princes Street Gardens.",
         "Edinburgh",
-        ["Music & Events"],
+        ["Concerts & Nightlife"],
         180,
         0,
     ),
@@ -524,16 +524,16 @@ EVENTS_DATA = [
         "Atlanta Jazz Festival",
         "One of the largest free jazz festivals in the US, held " "annually in Piedmont Park.",
         "Atlanta",
-        ["Music & Events"],
+        ["Concerts & Nightlife"],
         108,
         3,
     ),
-    # ── Nature (5 Kenya, 2 UK, 1 US) ────────────────────────────────
+    # ── Outdoors & Active - Nature (5 Kenya, 2 UK, 1 US) ────────────────────────────────
     (
         "Great Wildebeest Migration Viewing",
         "Guided safari viewing of the Great Migration at the Masai " "Mara with expert naturalist guides.",
         "Nairobi",
-        ["Nature"],
+        ["Outdoors & Active"],
         50,
         3,
     ),
@@ -541,7 +541,7 @@ EVENTS_DATA = [
         "Lake Nakuru Flamingo Walk",
         "A guided birding walk to see the famous flamingos and " "pelicans of Lake Nakuru National Park.",
         "Nakuru",
-        ["Nature"],
+        ["Outdoors & Active"],
         16,
         0,
     ),
@@ -550,7 +550,7 @@ EVENTS_DATA = [
         "A guided night walk through Kenya's largest coastal forest "
         "to spot owls, galagos, and golden-rumped elephant shrews.",
         "Malindi",
-        ["Nature", "Adventure"],
+        ["Outdoors & Active"],
         34,
         0,
     ),
@@ -558,7 +558,7 @@ EVENTS_DATA = [
         "Mount Longonot Day Hike",
         "A guided day hike up Mount Longonot's crater rim with " "panoramic Rift Valley views.",
         "Naivasha",
-        ["Nature", "Adventure"],
+        ["Outdoors & Active"],
         12,
         0,
     ),
@@ -566,7 +566,7 @@ EVENTS_DATA = [
         "Watamu Marine Park Snorkelling",
         "Guided snorkelling excursion in Watamu Marine National Park " "to explore coral gardens and tropical fish.",
         "Malindi",
-        ["Nature"],
+        ["Outdoors & Active"],
         46,
         0,
     ),
@@ -574,7 +574,7 @@ EVENTS_DATA = [
         "Scottish Highlands Wildlife Safari",
         "A 3-day guided wildlife safari in the Cairngorms searching " "for red deer, golden eagles, and red squirrels.",
         "Edinburgh",
-        ["Nature"],
+        ["Outdoors & Active"],
         170,
         3,
     ),
@@ -582,7 +582,7 @@ EVENTS_DATA = [
         "London Wetland Centre Bird Walk",
         "An early-morning birding walk at the London Wetland Centre " "with an RSPB guide.",
         "London",
-        ["Nature"],
+        ["Outdoors & Active"],
         42,
         0,
     ),
@@ -590,11 +590,35 @@ EVENTS_DATA = [
         "LA Griffith Park Sunset Hike",
         "A guided sunset hike in Griffith Park with views of the " "Hollywood Sign and downtown LA skyline.",
         "Los Angeles",
-        ["Nature"],
+        ["Outdoors & Active"],
         63,
         0,
     ),
-    # ── Extra events to hit 80+ (past events ~10%) ──────────────────
+    # ── New category examples + extras (~10%) ──────────────────────────────
+    (
+        "Achille Mbembe: Memory & Place",
+        "The renowned philosopher speaks on memory, place, and " "belonging at Goethe-Institut Nairobi.",
+        "Nairobi",
+        ["Talks & Ideas"],
+        52,
+        0,
+    ),
+    (
+        "Indigo Dyeing with Sosiani",
+        "Hands-on indigo dyeing workshop with sustainable textile " "collective Sosiani in Nairobi.",
+        "Nairobi",
+        ["Workshops & Classes"],
+        46,
+        0,
+    ),
+    (
+        "Spring Valley Farmers Market",
+        "Weekly farmers market in Spring Valley with fresh produce, " "artisan breads, and local honey.",
+        "Nairobi",
+        ["Markets & Pop-ups", "Food & Drink"],
+        7,
+        0,
+    ),
     (
         "Nairobi Wine & Cheese Evening",
         "An evening of wine and artisan cheese pairings at a " "Westlands rooftop bar.",
@@ -607,7 +631,7 @@ EVENTS_DATA = [
         "Mombasa Old Town Photography Walk",
         "A guided photography walk through Mombasa's historic " "Old Town capturing Swahili architecture.",
         "Mombasa",
-        ["Culture", "Learning"],
+        ["Culture & Arts", "Workshops & Classes"],
         -20,
         0,
     ),
@@ -615,7 +639,7 @@ EVENTS_DATA = [
         "Nairobi Half Marathon",
         "The annual Nairobi Half Marathon through Uhuru Gardens " "and the city centre.",
         "Nairobi",
-        ["Sports"],
+        ["Outdoors & Active"],
         -15,
         0,
     ),
@@ -623,7 +647,7 @@ EVENTS_DATA = [
         "Lamu Yoga Retreat",
         "A 5-day yoga and wellness retreat on Shela Beach with " "daily classes, meditation, and healthy meals.",
         "Lamu",
-        ["Learning", "Nature"],
+        ["Workshops & Classes", "Outdoors & Active"],
         -5,
         5,
     ),
@@ -631,7 +655,7 @@ EVENTS_DATA = [
         "Kisumu Sunset Dhow Cruise",
         "A sunset cruise on Lake Victoria aboard a traditional " "dhow with live taarab music.",
         "Kisumu",
-        ["Travel", "Music & Events"],
+        ["Travel", "Concerts & Nightlife"],
         -25,
         0,
     ),
@@ -639,7 +663,7 @@ EVENTS_DATA = [
         "London Afrobeats Brunch",
         "Brunch party featuring Afrobeats DJs, Nigerian jollof, " "and bottomless cocktails in Shoreditch.",
         "London",
-        ["Music & Events", "Food & Drink"],
+        ["Concerts & Nightlife", "Food & Drink"],
         -8,
         0,
     ),
@@ -647,7 +671,7 @@ EVENTS_DATA = [
         "Manchester Craft Beer Festival",
         "Over 100 craft beers from independent UK breweries with " "street food and live music.",
         "Manchester",
-        ["Food & Drink", "Music & Events"],
+        ["Food & Drink", "Concerts & Nightlife"],
         -12,
         2,
     ),
@@ -655,7 +679,7 @@ EVENTS_DATA = [
         "NYC African Diaspora Book Fair",
         "A book fair celebrating African and Caribbean authors with " "readings, signings, and panel discussions.",
         "New York",
-        ["Culture", "Learning"],
+        ["Culture & Arts", "Talks & Ideas"],
         -18,
         2,
     ),
@@ -672,7 +696,7 @@ EVENTS_DATA = [
         "Mombasa Kite Festival",
         "Hundreds of colourful kites fill the sky above Nyali " "Beach in this family-friendly annual festival.",
         "Mombasa",
-        ["Culture", "Nature"],
+        ["Culture & Arts", "Outdoors & Active"],
         56,
         2,
     ),
@@ -680,7 +704,7 @@ EVENTS_DATA = [
         "Nakuru Cycling Challenge",
         "A 100 km cycling challenge around Lake Nakuru with scenic " "views and wildlife sightings.",
         "Nakuru",
-        ["Sports", "Adventure"],
+        ["Outdoors & Active"],
         43,
         0,
     ),
@@ -688,7 +712,7 @@ EVENTS_DATA = [
         "Nairobi Pottery Workshop",
         "Hands-on pottery classes at the Kazuri Beads factory " "learning traditional Kenyan ceramic techniques.",
         "Nairobi",
-        ["Learning", "Culture"],
+        ["Workshops & Classes", "Culture & Arts"],
         22,
         0,
     ),
@@ -696,7 +720,7 @@ EVENTS_DATA = [
         "Diani Deep Sea Fishing Tournament",
         "Annual deep-sea fishing competition off the Diani coast " "targeting marlin, sailfish, and yellowfin tuna.",
         "Diani",
-        ["Sports", "Nature"],
+        ["Outdoors & Active"],
         102,
         2,
     ),
@@ -704,7 +728,7 @@ EVENTS_DATA = [
         "Birmingham Reggae Marathon",
         "A full marathon through Birmingham with reggae sound " "systems at every mile cheering runners on.",
         "Birmingham",
-        ["Sports", "Music & Events"],
+        ["Outdoors & Active", "Concerts & Nightlife"],
         142,
         0,
     ),
@@ -712,7 +736,7 @@ EVENTS_DATA = [
         "London Kenyan Food Pop-Up",
         "A pop-up restaurant in Peckham serving nyama choma, " "ugali, and Kenyan street food favourites.",
         "London",
-        ["Food & Drink", "Culture"],
+        ["Food & Drink", "Markets & Pop-ups"],
         77,
         3,
     ),
@@ -720,7 +744,7 @@ EVENTS_DATA = [
         "LA Outdoor Film Screening",
         "Classic films screened under the stars at the Hollywood " "Forever Cemetery with food trucks.",
         "Los Angeles",
-        ["Culture", "Music & Events"],
+        ["Culture & Arts", "Concerts & Nightlife"],
         88,
         0,
     ),
@@ -728,7 +752,7 @@ EVENTS_DATA = [
         "Nairobi Green City Marathon",
         "An eco-themed marathon promoting urban greening with " "tree planting along the route.",
         "Nairobi",
-        ["Sports", "Nature"],
+        ["Outdoors & Active"],
         -7,
         0,
     ),
@@ -736,36 +760,15 @@ EVENTS_DATA = [
         "Malindi Sea Turtle Release",
         "Help release rehabilitated sea turtles back into the " "Indian Ocean with marine conservationists.",
         "Malindi",
-        ["Nature", "Learning"],
+        ["Outdoors & Active", "Workshops & Classes"],
         33,
         0,
     ),
 ]
 
 
-# Curator notes for editor's picks (event name → note + curator)
-CURATOR_NOTES = {
-    "Koroga Festival Nairobi": (
-        "The one Nairobi event I never miss \u2014 arrive early for the jazz stage",
-        "Amani, Pursuit Editor",
-    ),
-    "Nairobi Restaurant Week": (
-        "Book at least three restaurants; the prix-fixe menus sell out fast",
-        "Joy, Pursuit Food Editor",
-    ),
-    "Nairobi Art Week": (
-        "Don\u2019t skip the Brush Tu studios \u2014 the open-air installations are worth the walk",
-        "Kofi, Pursuit Culture Editor",
-    ),
-    "Great Wildebeest Migration Viewing": (
-        "Book the dawn game drive. The light at 6 a.m. is unmatched",
-        "Lena, Pursuit Travel Editor",
-    ),
-    "Masai Mara Balloon Safari": (
-        "Easily the most breathtaking hour you\u2019ll spend in Kenya",
-        "Amani, Pursuit Editor",
-    ),
-}
+# Curator notes moved to EditorsPick model — no longer stored on Event
+CURATOR_NOTES = {}
 
 # Near-term events for "Next Up" strip testing
 # (name, description, city, categories, hours_from_now, curator_note, curator_name)
@@ -774,7 +777,7 @@ NEAR_TERM_EVENTS = [
         "Westlands Rooftop Sundowner",
         "Sunset cocktails and live acoustic sets at a Westlands rooftop bar.",
         "Nairobi",
-        ["Food & Drink", "Music & Events"],
+        ["Food & Drink", "Concerts & Nightlife"],
         8,
         "The best sunset view in town \u2014 grab the corner table",
         "Joy, Pursuit Food Editor",
@@ -783,7 +786,7 @@ NEAR_TERM_EVENTS = [
         "Karen Night Market",
         "Artisan vendors, street food, and live music at the Karen Hub.",
         "Nairobi",
-        ["Food & Drink", "Culture"],
+        ["Food & Drink", "Markets & Pop-ups"],
         14,
         None,
         None,
@@ -792,7 +795,7 @@ NEAR_TERM_EVENTS = [
         "Uhuru Gardens Yoga at Dawn",
         "A free community yoga session at sunrise in Uhuru Gardens.",
         "Nairobi",
-        ["Sports", "Nature"],
+        ["Outdoors & Active"],
         20,
         None,
         None,
@@ -852,8 +855,6 @@ class Command(BaseCommand):
             end = start + timedelta(days=duration_days) if duration_days else None  # noqa: E501
             primary_cat = cat_names[0] if cat_names else "Travel"
 
-            curator_note, curator_name = CURATOR_NOTES.get(name, (None, None))
-
             event, created = Event.objects.get_or_create(
                 name=name,
                 defaults={
@@ -865,8 +866,6 @@ class Command(BaseCommand):
                     "timezone": TIMEZONES.get(city, "Africa/Nairobi"),
                     "image": IMAGES.get(primary_cat, ""),
                     "is_active": True,
-                    "curator_note": curator_note or "",
-                    "curator_name": curator_name or "",
                 },
             )
 
@@ -877,11 +876,6 @@ class Command(BaseCommand):
                         event.category.add(cat)
                 created_count += 1
             else:
-                # Update curator fields on existing events
-                if curator_note and not event.curator_note:
-                    event.curator_note = curator_note
-                    event.curator_name = curator_name or ""
-                    event.save(update_fields=["curator_note", "curator_name"])
                 skipped_count += 1
 
         # --- Seed near-term events ---
@@ -892,8 +886,8 @@ class Command(BaseCommand):
             city,
             cat_names,
             hours_from_now,
-            curator_note,
-            curator_name,
+            _curator_note,  # Ignored - curator notes now in EditorsPick
+            _curator_name,
         ) in NEAR_TERM_EVENTS:
             start = timezone.now() + timedelta(hours=hours_from_now)
             primary_cat = cat_names[0] if cat_names else "Food & Drink"
@@ -909,8 +903,6 @@ class Command(BaseCommand):
                     "timezone": TIMEZONES.get(city, "Africa/Nairobi"),
                     "image": IMAGES.get(primary_cat, ""),
                     "is_active": True,
-                    "curator_note": curator_note or "",
-                    "curator_name": curator_name or "",
                 },
             )
             if created:
@@ -923,6 +915,63 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(
             f"Seeded {created_count} events ({skipped_count} already existed), "
             f"{near_term_count} near-term events."
+        ))
+
+        # --- Seed Editor's Picks ---
+        from apps.events.models import EditorsPick
+
+        picks_data = [
+            # Nairobi - active now
+            ("Wildlife Photography Masterclass", "nairobi", 0, 14,
+             "Nakuru National Park offers some of East Africa\u2019s most stunning wildlife backdrops \u2014 this workshop is a rare chance to learn from award-winning pros who know every corner of the park. Perfect for serious hobbyists and aspiring pros alike.",
+             "Amani, Pursuit Editor"),
+            # Mombasa - active now
+            ("Mombasa Street Food Festival", "mombasa", 0, 14,
+             "The coastal street food scene is unlike anywhere else in Kenya \u2014 come hungry and expect biryani that rivals Zanzibar\u2019s best. The viazi karai alone is worth the trip.",
+             "Joy, Pursuit Food Editor"),
+            # Kisumu - active in 2 weeks
+            ("Kisumu Fish Festival", "kisumu", 14, 21,
+             "Lake Victoria\u2019s fishing heritage comes alive in this two-day lakeside celebration. Don\u2019t miss the omena tastings \u2014 crispy, fresh, and served with ugali on the shore.",
+             "Kofi, Pursuit Culture Editor"),
+        ]
+
+        picks_created = 0
+        picks_skipped = 0
+
+        for event_name, location_tag, active_from_days, active_until_days, curator_note, curator_name in picks_data:
+            event = Event.objects.filter(name=event_name).first()
+            if not event:
+                self.stdout.write(self.style.WARNING(f"Event '{event_name}' not found for Editor's Pick — skipping."))
+                continue
+
+            active_from = timezone.now() + timedelta(days=active_from_days)
+            active_until = timezone.now() + timedelta(days=active_until_days)
+
+            pick, created = EditorsPick.objects.get_or_create(
+                event=event,
+                location_tag=location_tag,
+                defaults={
+                    "active_from": active_from,
+                    "active_until": active_until,
+                    "curator_note": curator_note,
+                    "curator_name": curator_name,
+                    "position": 1,
+                }
+            )
+
+            if created:
+                picks_created += 1
+            else:
+                # Update if exists
+                pick.active_from = active_from
+                pick.active_until = active_until
+                pick.curator_note = curator_note
+                pick.curator_name = curator_name
+                pick.save(update_fields=["active_from", "active_until", "curator_note", "curator_name"])
+                picks_skipped += 1
+
+        self.stdout.write(self.style.SUCCESS(
+            f"Seeded {picks_created} Editor's Picks ({picks_skipped} already existed)."
         ))
 
         # --- Scenario setup for test user ---

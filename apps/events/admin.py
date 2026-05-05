@@ -1,9 +1,10 @@
 from django import forms
 from django.contrib.gis import admin
+from django.utils import timezone
 
 from apps.core.storage import upload_image
 
-from .models import Event, UserEvents
+from .models import EditorsPick, Event, UserEvents
 
 
 class EventAdminForm(forms.ModelForm):
@@ -55,7 +56,6 @@ class EventAdmin(admin.GISModelAdmin):
         (None, {"fields": ("name", "description", "category", "date", "end_date")}),
         ("Location", {"fields": ("location_name", "location", "timezone")}),
         ("Media", {"fields": ("image_file", "image")}),
-        ("Editorial", {"fields": ("curator_note", "curator_name"), "classes": ("collapse",)}),
         ("Settings", {"fields": ("is_free", "is_active", "more_details_url")}),
         ("Timestamps", {"fields": ("created_at", "updated_at"), "classes": ("collapse",)}),
     )
@@ -93,3 +93,37 @@ class UserEventsAdmin(admin.ModelAdmin):
 
 
 admin.site.register(UserEvents, UserEventsAdmin)
+
+
+@admin.register(EditorsPick)
+class EditorsPickAdmin(admin.ModelAdmin):
+    """Admin interface for Editor's Pick curation"""
+
+    list_display = ["event", "location_tag", "active_from", "active_until", "curator_name", "is_active"]
+    list_filter = ["location_tag", "active_from"]
+    search_fields = ["event__name", "curator_note", "location_tag"]
+    raw_id_fields = ["event"]
+    date_hierarchy = "active_from"
+    ordering = ["-active_from", "position"]
+
+    fieldsets = (
+        (None, {"fields": ("event", "location_tag", "curator_note", "curator_name")}),
+        ("Scheduling", {"fields": ("active_from", "active_until", "position")}),
+    )
+
+    def is_active(self, obj):
+        """Show whether this pick is currently active"""
+        now = timezone.now()
+        return obj.active_from <= now <= obj.active_until
+
+    is_active.boolean = True
+    is_active.short_description = "Active"
+
+    def save_model(self, request, obj, form, change):
+        """Set default dates for new picks"""
+        if not change:  # New object
+            if not obj.active_from:
+                obj.active_from = timezone.now()
+            if not obj.active_until:
+                obj.active_until = obj.active_from + timezone.timedelta(days=7)
+        super().save_model(request, obj, form, change)

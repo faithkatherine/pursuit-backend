@@ -19,8 +19,6 @@ class Event(models.Model):
     more_details_url = models.URLField(null=True, blank=True)
     is_free = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
-    curator_note = models.TextField(null=True, blank=True, help_text="Optional editorial note for featured/editor's pick events")
-    curator_name = models.CharField(max_length=100, null=True, blank=True, help_text="Attribution for the curator note, e.g. 'Pursuit team'")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -42,6 +40,47 @@ class Event(models.Model):
             models.Index(fields=["is_active", "date"]),
             models.Index(fields=["is_free", "date"]),
         ]
+
+
+class EditorsPick(models.Model):
+    """Curated Editor's Pick events scoped by location tag"""
+
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name="editors_picks")
+    location_tag = models.CharField(
+        max_length=100, db_index=True, help_text="Location scope for this pick (e.g., 'nairobi', 'mombasa')"
+    )
+    active_from = models.DateTimeField(help_text="When this pick becomes active")
+    active_until = models.DateTimeField(help_text="When this pick expires")
+    curator_note = models.TextField(help_text="Required editorial note explaining why this event is featured")
+    curator_name = models.CharField(
+        max_length=100,
+        blank=True,
+        default="Pursuit team",
+        help_text="Attribution for the curator (e.g., 'Pursuit team', 'Jane Doe')",
+    )
+    position = models.PositiveSmallIntegerField(
+        default=1, help_text="Reserved for future multi-pick surfaces; v1 always uses position=1"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-active_from", "position"]
+        verbose_name = "Editor's Pick"
+        verbose_name_plural = "Editor's Picks"
+        indexes = [
+            models.Index(fields=["location_tag", "active_from"]),
+            models.Index(fields=["active_from", "active_until"]),
+        ]
+
+    def save(self, *args, **kwargs):
+        # Normalize location_tag for reliable matching
+        if self.location_tag:
+            self.location_tag = self.location_tag.strip().lower()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.event.name} — {self.location_tag} ({self.active_from.date()})"
 
 
 class UserEvents(models.Model):
