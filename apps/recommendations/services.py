@@ -28,7 +28,7 @@ MIN_RESULTS = 3  # backfill with popular events if fewer than this
 
 
 def get_recommended_events(
-    user, offset=0, limit=10, neighborhood_id=None, date_from=None, date_to=None, exclude_event_ids=None
+    user, offset=0, limit=10, date_from=None, date_to=None, exclude_event_ids=None
 ):
     """
     Returns a list of (Event, reason_str, source_str) tuples
@@ -39,7 +39,7 @@ def get_recommended_events(
     """
     exclude_event_ids = exclude_event_ids or []
     exclude_key = ",".join(str(eid) for eid in sorted(exclude_event_ids)) if exclude_event_ids else "none"
-    cache_key = f"recs:{user.id}:{offset}:{limit}:{neighborhood_id or 'all'}:{date_from}:{date_to}:{exclude_key}"
+    cache_key = f"recs:{user.id}:{offset}:{limit}:{date_from}:{date_to}:{exclude_key}"
     cached = cache.get(cache_key)
     if cached is not None:
         return cached
@@ -203,7 +203,7 @@ def _determine_reason(event, event_category_ids, content_score, collab_score, po
     return ("Recommended for you", "featured")
 
 
-def get_trending_events(user, limit=5, neighborhood_id=None, date_from=None, date_to=None, exclude_event_ids=None):
+def get_trending_events(user, limit=5, date_from=None, date_to=None, exclude_event_ids=None):
     """
     Returns a list of (Event, reason_str, source_str) tuples
     for the most popular events — purely by save_count, no personalization.
@@ -213,7 +213,7 @@ def get_trending_events(user, limit=5, neighborhood_id=None, date_from=None, dat
     """
     exclude_event_ids = exclude_event_ids or []
     exclude_key = ",".join(str(eid) for eid in sorted(exclude_event_ids)) if exclude_event_ids else "none"
-    cache_key = f"trending:{user.id}:{limit}:{neighborhood_id or 'all'}:{date_from}:{date_to}:{exclude_key}"
+    cache_key = f"trending:{user.id}:{limit}:{date_from}:{date_to}:{exclude_key}"
     cached = cache.get(cache_key)
     if cached is not None:
         return cached

@@ -1,0 +1,28 @@
+"""GraphQL Weather type"""
+type WeatherType {
+  city: String
+  condition: String
+  temperature: Float
+  icon: String
+}
+
+"""GraphQL HomeData type"""
+type HomeDataType {
+  id: String
+  greeting: String
+  greetingPrompt: String
+  timeOfDay: String
+  dayOfWeek: String
+  cityName: String
+  weather: WeatherType
+  profilePicture: String
+  userLocation: String
+  allowLocationSharing: Boolean
+  categories: [CategoryType]
+  editorsPick: EventType
+  recommendations: [EventType]
+  trending: [EventType]
+  upcomingEvents: [EventType]
+  nextSavedEvent: EventType
+  activeTrip: TripType
+}

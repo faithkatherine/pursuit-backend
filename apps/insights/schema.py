@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 import graphene
+import pytz
 from django.utils import timezone
 
 from apps.core.models import Category
@@ -11,8 +12,8 @@ from apps.events.models import EditorsPick, Event, UserEvents
 from apps.itinerary.models import Trip
 from apps.recommendations.services import get_recommended_events, get_trending_events
 
-from .models import Neighborhood
 from .services import fetch_weather_for_city, fetch_weather_for_coordinates
+from .types import HomeDataType, WeatherType
 
 # ---------------------------------------------------------------------------
 # Greeting helpers
@@ -41,10 +42,20 @@ _SUBTITLE_SETS = {
 }
 
 
-def _get_time_bucket():
-    """Return a 4-part time bucket: morning / afternoon / evening / late."""
+def _get_time_bucket(user_timezone="UTC"):
+    """Return a 4-part time bucket: morning / afternoon / evening / late.
 
-    hour = timezone.localtime().hour
+    Args:
+        user_timezone: User's timezone string (e.g., 'Africa/Nairobi', 'America/New_York')
+    """
+    try:
+        tz = pytz.timezone(user_timezone)
+    except (pytz.UnknownTimeZoneError, AttributeError):
+        tz = pytz.UTC
+
+    now_in_user_tz = timezone.now().astimezone(tz)
+    hour = now_in_user_tz.hour
+
     if 5 <= hour < 12:
         return "morning"
     if 12 <= hour < 17:
@@ -54,9 +65,14 @@ def _get_time_bucket():
     return "late"
 
 
-def _get_greeting(first_name=None):
-    """Build a time-aware greeting string, e.g. 'Good morning, Faith'."""
-    bucket = _get_time_bucket()
+def _get_greeting(first_name=None, user_timezone="UTC"):
+    """Build a time-aware greeting string, e.g. 'Good morning, Faith'.
+
+    Args:
+        first_name: User's first name
+        user_timezone: User's timezone string
+    """
+    bucket = _get_time_bucket(user_timezone)
     name = f", {first_name}" if first_name else ""
     if bucket == "morning":
         return f"Good morning{name}"
@@ -68,13 +84,25 @@ def _get_greeting(first_name=None):
     return f"Still up, {first_name}?" if first_name else "Still up?"
 
 
-def _get_greeting_prompt(user_id=None):
-    """Deterministic daily subtitle — stable within a day, changes day-to-day."""
+def _get_greeting_prompt(user_id=None, user_timezone="UTC"):
+    """Deterministic daily subtitle — stable within a day, changes day-to-day.
 
-    bucket = _get_time_bucket()
+    Args:
+        user_id: User ID for deterministic hashing
+        user_timezone: User's timezone string
+    """
+    bucket = _get_time_bucket(user_timezone)
     options = _SUBTITLE_SETS[bucket]
-    now = timezone.localtime()
-    date_str = f"{now.year}-{now.month - 1}-{now.day}"  # month-1 to match JS Date.getMonth()
+
+    try:
+        tz = pytz.timezone(user_timezone)
+    except (pytz.UnknownTimeZoneError, AttributeError):
+        tz = pytz.UTC
+
+    now_in_user_tz = timezone.now().astimezone(tz)
+    date_str = (
+        f"{now_in_user_tz.year}-{now_in_user_tz.month - 1}-{now_in_user_tz.day}"  # month-1 to match JS Date.getMonth()
+    )
     seed = f"{date_str}:{user_id or 'anon'}"
     h = 0
     for ch in seed:
@@ -86,54 +114,6 @@ def _get_greeting_prompt(user_id=None):
     return options[index]
 
 
-class WeatherType(graphene.ObjectType):
-    """GraphQL Weather type"""
-
-    city = graphene.String()
-    condition = graphene.String()
-    temperature = graphene.Float()
-    icon = graphene.String()
-
-
-class NeighborhoodType(graphene.ObjectType):
-    """GraphQL Neighborhood type"""
-
-    id = graphene.ID()
-    name = graphene.String()
-    city = graphene.String()
-
-
-class HomeDataType(graphene.ObjectType):
-    """GraphQL HomeData type"""
-
-    id = graphene.String()
-    greeting = graphene.String()
-    greeting_prompt = graphene.String()
-    time_of_day = graphene.String()
-    day_of_week = graphene.String()
-    city_name = graphene.String()
-    weather = graphene.Field(WeatherType)
-    profile_picture = graphene.String()
-    user_location = graphene.String()
-    allow_location_sharing = graphene.Boolean()
-    active_neighborhood = graphene.Field(NeighborhoodType)
-    neighborhoods = graphene.List(NeighborhoodType)
-    categories = graphene.List("apps.core.schema.CategoryType")
-    recommendations = graphene.List("apps.events.types.EventType")
-    trending = graphene.List("apps.events.types.EventType")
-    upcoming_events = graphene.List("apps.events.types.EventType")
-    active_trip = graphene.Field("apps.itinerary.types.TripType")
-
-
-def _get_weather_for_neighborhood(neighborhood):
-    """Fetch weather for a specific neighborhood's coordinates."""
-    return fetch_weather_for_coordinates(
-        float(neighborhood.latitude),
-        float(neighborhood.longitude),
-        city_hint=neighborhood.name,
-    )
-
-
 def _get_weather_for_user(user):
     """Resolve weather using coordinates -> city name -> fallback chain."""
     profile = getattr(user, "profile", None)
@@ -143,7 +123,7 @@ def _get_weather_for_user(user):
         return fetch_weather_for_coordinates(lat, lon, city_hint)
     if profile and profile.location_name:
         return fetch_weather_for_city(profile.location_name)
-    return fetch_weather_for_city("New York")
+    return fetch_weather_for_city("Nairobi")
 
 
 def _weather_to_type(weather):
@@ -155,10 +135,20 @@ def _weather_to_type(weather):
     )
 
 
-def _get_time_of_day():
-    """Return time of day string based on current hour."""
+def _get_time_of_day(user_timezone="UTC"):
+    """Return time of day string based on current hour in user's timezone.
 
-    hour = timezone.localtime().hour
+    Args:
+        user_timezone: User's timezone string
+    """
+    try:
+        tz = pytz.timezone(user_timezone)
+    except (pytz.UnknownTimeZoneError, AttributeError):
+        tz = pytz.UTC
+
+    now_in_user_tz = timezone.now().astimezone(tz)
+    hour = now_in_user_tz.hour
+
     if hour < 12:
         return "morning"
     elif hour < 17:
@@ -166,16 +156,23 @@ def _get_time_of_day():
     return "evening"
 
 
-def _get_day_of_week():
-    """Return current day of week name."""
+def _get_day_of_week(user_timezone="UTC"):
+    """Return current day of week name in user's timezone.
 
-    return timezone.localtime().strftime("%A")
+    Args:
+        user_timezone: User's timezone string
+    """
+    try:
+        tz = pytz.timezone(user_timezone)
+    except (pytz.UnknownTimeZoneError, AttributeError):
+        tz = pytz.UTC
+
+    now_in_user_tz = timezone.now().astimezone(tz)
+    return now_in_user_tz.strftime("%A")
 
 
-def _get_city_name(user, neighborhood=None):
-    """Determine city name from neighborhood or user profile."""
-    if neighborhood:
-        return neighborhood.city
+def _get_city_name(user):
+    """Determine city name from user profile."""
     profile = getattr(user, "profile", None)
     if profile and profile.location_name:
         # location_name is typically "City, Region" — extract city
@@ -219,11 +216,10 @@ class InsightsQueries(graphene.ObjectType):
         HomeDataType,
         offset=graphene.Int(),
         limit=graphene.Int(),
-        neighborhood_id=graphene.ID(),
         time_filter=graphene.String(),
     )
 
-    def resolve_get_home(self, info, offset=0, limit=10, neighborhood_id=None, time_filter=None):
+    def resolve_get_home(self, info, offset=0, limit=10, time_filter=None):
         user = info.context.user
         if not user.is_authenticated:
             return None
@@ -233,29 +229,24 @@ class InsightsQueries(graphene.ObjectType):
         if time_filter:
             date_from, date_to = _resolve_time_filter(time_filter)
 
-        # Resolve neighborhood
-        active_neighborhood = None
-        if neighborhood_id:
-            active_neighborhood = Neighborhood.objects.filter(id=neighborhood_id).first()
-
-        # Weather: use neighborhood coords if selected, else user's location
-        if active_neighborhood:
-            weather = _get_weather_for_neighborhood(active_neighborhood)
-        else:
-            weather = _get_weather_for_user(user)
-        weather_type = _weather_to_type(weather)
-
         profile = getattr(user, "profile", None)
+
+        # Get user's timezone from profile (defaults to UTC)
+        user_timezone = profile.timezone if profile and profile.timezone else "UTC"
+
+        # Check location sharing permission
+        allow_location_sharing = profile.allow_location_sharing if profile else False
+
+        # Weather: use user's location only if sharing is enabled
+        weather_type = None
+        if allow_location_sharing:
+            weather = _get_weather_for_user(user)
+            weather_type = _weather_to_type(weather)
 
         now = timezone.now()
         effective_tag = "nairobi"  # fallback
 
-        if neighborhood_id and active_neighborhood:
-            # Manual filter selected → derive from neighborhood coords
-            effective_tag = location_tag_from_coords(
-                float(active_neighborhood.latitude), float(active_neighborhood.longitude)
-            )
-        elif profile and profile.has_location:
+        if profile and profile.has_location:
             # User has GPS coords → derive tag and update profile
             lat, lon = profile.coordinates
             effective_tag = location_tag_from_coords(lat, lon)
@@ -266,7 +257,7 @@ class InsightsQueries(graphene.ObjectType):
             # Use stored tag from last sync
             effective_tag = profile.last_synced_location_tag
 
-        # Check for active trip (takes priority over Editor's Pick)
+        # Check for active trip
         thirty_days = now + timedelta(days=30)
         active_trip = (
             Trip.objects.filter(
@@ -279,23 +270,30 @@ class InsightsQueries(graphene.ObjectType):
             .first()
         )
 
-        # Query Editor's Pick only if no active trip
-        editors_pick = None
+        # Query Editor's Pick (independent of active trip)
+        editors_pick_event = None
         editors_pick_event_id = None
-        if not active_trip:
-            editors_pick = (
-                EditorsPick.objects.filter(
-                    location_tag=effective_tag,
-                    active_from__lte=now,
-                    active_until__gte=now,
-                    position=1,
-                )
-                .select_related("event")
-                .order_by("-active_from")
-                .first()
+        editors_pick = (
+            EditorsPick.objects.filter(
+                location_tag=effective_tag,
+                active_from__lte=now,
+                active_until__gte=now,
+                position=1,
             )
-            if editors_pick:
-                editors_pick_event_id = editors_pick.event.id
+            .select_related("event")
+            .order_by("-active_from")
+            .first()
+        )
+        if editors_pick:
+            editors_pick_event_id = editors_pick.event.id
+            # Set attributes on the editor's pick event
+            editors_pick_event = editors_pick.event
+            editors_pick_event._reason = "Editor's pick"
+            editors_pick_event._source = "editorial"
+            editors_pick_event._is_saved = False
+            editors_pick_event._curator_note = editors_pick.curator_note
+            editors_pick_event._curator_name = editors_pick.curator_name
+            editors_pick_event._is_editors_pick = True
 
         # Prepare exclusion list for recommendations and trending
         exclude_event_ids = [editors_pick_event_id] if editors_pick_event_id else []
@@ -310,17 +308,6 @@ class InsightsQueries(graphene.ObjectType):
             exclude_event_ids=exclude_event_ids,
         )
         recommendations = []
-
-        # If Editor's Pick exists, prepend it as the first recommendation
-        if editors_pick:
-            pick_event = editors_pick.event
-            pick_event._reason = "Editor's pick"
-            pick_event._source = "editorial"
-            pick_event._is_saved = False
-            pick_event._curator_note = editors_pick.curator_note
-            pick_event._curator_name = editors_pick.curator_name
-            pick_event._is_editors_pick = True
-            recommendations.append(pick_event)
 
         # Add algorithm recommendations (already excludes the pick event)
         for event, reason, source in rec_results:
@@ -347,8 +334,6 @@ class InsightsQueries(graphene.ObjectType):
             trending.append(event)
 
         # Get user's upcoming saved events
-
-        now = timezone.now()
         saved_event_ids = UserEvents.objects.filter(user=user).values_list("event_id", flat=True)
         upcoming = list(
             Event.objects.filter(
@@ -362,25 +347,27 @@ class InsightsQueries(graphene.ObjectType):
         for event in upcoming:
             event._is_saved = True
 
-        # All available neighborhoods
-        all_neighborhoods = list(Neighborhood.objects.all())
+        # Get next saved event (first upcoming saved event)
+        next_saved_event = None
+        if upcoming:
+            next_saved_event = upcoming[0]
 
         return HomeDataType(
             id=str(user.id),
-            greeting=_get_greeting(user.first_name),
-            greeting_prompt=_get_greeting_prompt(str(user.id)),
-            time_of_day=_get_time_of_day(),
-            day_of_week=_get_day_of_week(),
-            city_name=_get_city_name(user, active_neighborhood),
+            greeting=_get_greeting(user.first_name, user_timezone),
+            greeting_prompt=_get_greeting_prompt(str(user.id), user_timezone),
+            time_of_day=_get_time_of_day(user_timezone),
+            day_of_week=_get_day_of_week(user_timezone),
+            city_name=_get_city_name(user) if allow_location_sharing else None,
             weather=weather_type,
             profile_picture=user.profile_picture or "",
-            user_location=profile.location_name if profile else "",
-            allow_location_sharing=profile.allow_location_sharing if profile else False,
-            active_neighborhood=active_neighborhood,
-            neighborhoods=all_neighborhoods,
+            user_location=profile.location_name if (profile and allow_location_sharing) else None,
+            allow_location_sharing=allow_location_sharing,
             categories=Category.objects.filter(is_active=True)[:6],
+            editors_pick=editors_pick_event,
             recommendations=recommendations,
             trending=trending,
             upcoming_events=upcoming,
+            next_saved_event=next_saved_event,
             active_trip=active_trip,
         )

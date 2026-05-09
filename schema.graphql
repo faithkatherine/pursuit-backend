@@ -5,7 +5,6 @@ type Query {
   events(search: String, category: [ID], dateFrom: DateTime, dateTo: DateTime, latitude: Float, longitude: Float, radiusKm: Float, isFree: Boolean, offset: Int, limit: Int): EventsListPayload
   event(id: ID!): EventPayload
   savedEvents(offset: Int, limit: Int): EventsListPayload
-  getHome(offset: Int, limit: Int, neighborhoodId: ID, timeFilter: String): HomeDataType
   getRecommendations(offset: Int, limit: Int): [EventType]
   getBucketCategories: [CategoryType]
   getBucketItems(categoryId: String): [BucketItemType]
@@ -262,42 +261,6 @@ type EventsListPayload {
 type EventPayload {
   ok: Boolean!
   event: EventType
-}
-
-"""GraphQL HomeData type"""
-type HomeDataType {
-  id: String
-  greeting: String
-  greetingPrompt: String
-  timeOfDay: String
-  dayOfWeek: String
-  cityName: String
-  weather: WeatherType
-  profilePicture: String
-  userLocation: String
-  allowLocationSharing: Boolean
-  activeNeighborhood: NeighborhoodType
-  neighborhoods: [NeighborhoodType]
-  categories: [CategoryType]
-  recommendations: [EventType]
-  trending: [EventType]
-  upcomingEvents: [EventType]
-  activeTrip: TripType
-}
-
-"""GraphQL Weather type"""
-type WeatherType {
-  city: String
-  condition: String
-  temperature: Float
-  icon: String
-}
-
-"""GraphQL Neighborhood type"""
-type NeighborhoodType {
-  id: ID
-  name: String
-  city: String
 }
 
 """Trip GraphQL type with cover_image fallback chain."""

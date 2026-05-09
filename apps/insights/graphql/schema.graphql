@@ -1,0 +1,4 @@
+extend type Query {
+  """Get home screen data with personalized recommendations, trending events, and user context"""
+  getHome(offset: Int, limit: Int, timeFilter: String): HomeDataType
+}
