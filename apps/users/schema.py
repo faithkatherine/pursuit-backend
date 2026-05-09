@@ -512,6 +512,26 @@ class EnableLocation(graphene.Mutation):
         return EnableLocation(ok=True, user=user)
 
 
+class DisableLocation(graphene.Mutation):
+    """Disable location sharing and clear location data"""
+
+    ok = graphene.Boolean()
+    user = graphene.Field(UserType)
+
+    def mutate(self, info):
+        user = info.context.user
+        if user.is_anonymous:
+            raise GraphQLError(message="Not authenticated", extensions={"code": "NOT_AUTHENTICATED"})
+
+        profile = user.profile
+        profile.allow_location_sharing = False
+        profile.location = None
+        profile.location_name = None
+        profile.save()
+
+        return DisableLocation(ok=True, user=user)
+
+
 # =============================================================================
 # Combined Query and Mutation Classes
 # =============================================================================
@@ -543,6 +563,7 @@ class UserMutations(graphene.ObjectType):
 
     complete_onboarding = CompleteOnboarding.Field()
     enable_location = EnableLocation.Field()
+    disable_location = DisableLocation.Field()
     google_sign_in = GoogleSignIn.Field()
     refresh_access_token = RefreshAccessToken.Field()
     sign_in = SignIn.Field()
