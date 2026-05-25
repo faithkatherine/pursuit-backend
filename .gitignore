@@ -48,6 +48,10 @@ ENV/
 *.swo
 *~
 
+# Agent Integrations
+.codex/
+.claude/
+
 # macOS
 .DS_Store
 

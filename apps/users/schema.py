@@ -526,7 +526,7 @@ class DisableLocation(graphene.Mutation):
         profile = user.profile
         profile.allow_location_sharing = False
         profile.location = None
-        profile.location_name = None
+        profile.location_name = ""  # Empty string instead of None to satisfy NOT NULL constraint
         profile.save()
 
         return DisableLocation(ok=True, user=user)
