@@ -1,10 +1,29 @@
 from django import forms
+from django.contrib import admin as django_admin
 from django.contrib.gis import admin
 from django.utils import timezone
 
 from apps.core.storage import upload_image
 
 from .models import EditorsPick, Event, UserEvents
+
+
+class IsPaidFilter(django_admin.SimpleListFilter):
+    title = "is paid"
+    parameter_name = "is_paid"
+
+    def lookups(self, request, model_admin):
+        return (
+            ("yes", "Paid"),
+            ("no", "Free"),
+        )
+
+    def queryset(self, request, queryset):
+        if self.value() == "yes":
+            return queryset.filter(price__gt=0)
+        if self.value() == "no":
+            return queryset.filter(price=0)
+        return queryset
 
 
 class EventAdminForm(forms.ModelForm):
@@ -46,9 +65,19 @@ class EventAdminForm(forms.ModelForm):
 
 class EventAdmin(admin.GISModelAdmin):
     form = EventAdminForm
-    list_display = ("name", "date", "get_categories", "location_name", "is_free", "is_active")
-    search_fields = ("name", "description", "location_name")
-    list_filter = ("category", "is_active", "is_free", "date")
+    list_display = (
+        "name",
+        "date",
+        "get_categories",
+        "location_name",
+        "price",
+        "is_free",
+        "ticketing_enabled",
+        "going_count",
+        "is_active",
+    )
+    search_fields = ("name", "description", "location_name", "series_name")
+    list_filter = ("category", "is_active", "is_free", IsPaidFilter, "ticketing_enabled", "has_gallery", "date")
     readonly_fields = ("created_at", "updated_at")
     actions = ["deactivate_events", "activate_events"]
     gis_widget_kwargs = {"attrs": {"default_lon": -84.388, "default_lat": 33.749, "default_zoom": 11}}
@@ -56,7 +85,12 @@ class EventAdmin(admin.GISModelAdmin):
         (None, {"fields": ("name", "description", "category", "date", "end_date")}),
         ("Location", {"fields": ("location_name", "location", "timezone")}),
         ("Media", {"fields": ("image_file", "image")}),
-        ("Settings", {"fields": ("is_free", "is_active", "more_details_url")}),
+        (
+            "Ticketing",
+            {"fields": ("price", "is_free", "ticketing_enabled", "available_tickets", "going_count")},
+        ),
+        ("Gallery", {"fields": ("has_gallery", "gallery_images", "gallery_description")}),
+        ("Settings", {"fields": ("is_active", "more_details_url", "series_name")}),
         ("Timestamps", {"fields": ("created_at", "updated_at"), "classes": ("collapse",)}),
     )
 

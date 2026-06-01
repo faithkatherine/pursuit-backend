@@ -1,3 +1,6 @@
+import os
+import re
+from decimal import Decimal
 from datetime import timedelta
 
 from django.contrib.gis.geos import Point
@@ -5,7 +8,12 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 
 from apps.core.models import Category
-from apps.events.models import Event
+from apps.events.models import EditorsPick, Event
+from apps.events.utils.unsplash import (
+    FALLBACK_IMAGE_URLS,
+    fetch_unsplash_gallery_images,
+    fetch_unsplash_image_url,
+)
 
 # Real coordinates for cities
 COORDS = {
@@ -803,6 +811,590 @@ NEAR_TERM_EVENTS = [
 ]
 
 
+CATEGORY_NAMES_BY_SLUG = {
+    "concerts-and-nightlife": "Concerts & Nightlife",
+    "outdoors-and-active": "Outdoors & Active",
+    "food-and-drink": "Food & Drink",
+    "culture-and-arts": "Culture & Arts",
+    "talks-and-ideas": "Talks & Ideas",
+    "workshops-and-classes": "Workshops & Classes",
+    "markets-and-popups": "Markets & Pop-ups",
+    "travel": "Travel",
+}
+
+VENUES = {
+    "Alchemist Bar": {"neighborhood": "Westlands", "point": Point(36.8047, -1.2640, srid=4326)},
+    "GoDown Arts Centre": {"neighborhood": "Ngara", "point": Point(36.8393, -1.2913, srid=4326)},
+    "Karura Forest": {"neighborhood": "Gigiri", "point": Point(36.8391, -1.2341, srid=4326)},
+    "Alliance Française": {"neighborhood": "Westlands", "point": Point(36.8065, -1.2648, srid=4326)},
+    "Circle Art Gallery": {"neighborhood": "Lavington", "point": Point(36.7793, -1.2898, srid=4326)},
+    "Spring Valley Community Market": {"neighborhood": "Spring Valley", "point": Point(36.7930, -1.2534, srid=4326)},
+    "Ngong Racecourse": {"neighborhood": "Ngong Rd", "point": Point(36.7560, -1.3158, srid=4326)},
+    "PAWA254": {"neighborhood": "Nairobi West", "point": Point(36.8202, -1.3065, srid=4326)},
+    "Cultiva Farm": {"neighborhood": "Tigoni", "point": Point(36.6667, -1.1333, srid=4326)},
+    "Nairobi National Museum": {"neighborhood": "CBD", "point": Point(36.8157, -1.2734, srid=4326)},
+    "The Hub Karen": {"neighborhood": "Karen", "point": Point(36.7073, -1.3194, srid=4326)},
+}
+
+EXTERNAL_LINKS = {
+    "Alchemist Bar": "https://alchemistbar.co.ke/events",
+    "Alliance Française": "https://www.alliance-francaise.or.ke",
+    "GoDown Arts Centre": "https://www.godown.or.ke",
+}
+
+
+def _next_weekday_start(weekday, hour):
+    now = timezone.localtime(timezone.now())
+    days_ahead = (weekday - now.weekday()) % 7
+    if days_ahead == 0:
+        days_ahead = 7
+    return now.replace(hour=hour, minute=0, second=0, microsecond=0) + timedelta(days=days_ahead)
+
+
+def _generated_start(schedule):
+    kind, amount, hour = schedule
+    now = timezone.localtime(timezone.now())
+    if kind == "hours":
+        return now + timedelta(hours=amount)
+    if kind == "weekend":
+        return _next_weekday_start(amount, hour)
+    return now.replace(hour=hour, minute=0, second=0, microsecond=0) + timedelta(days=amount)
+
+
+GENERATED_NAIROBI_EVENTS = [
+    {
+        "name": "Jazz & Spoken Word at Alchemist",
+        "category_slug": "concerts-and-nightlife",
+        "venue": "Alchemist Bar",
+        "schedule": ("hours", 2, None),
+        "duration_days": 0,
+        "is_free": False,
+        "ticketing_enabled": False,
+        "curator_note": "Get the courtyard seats - the indoor sound is muddier after 10pm. Arrive before the first poetry set if you want a clean view of the band.",
+        "curator_name": "Pursuit team",
+        "description": "A late-night blend of Nairobi jazz players and spoken word poets takes over the Alchemist courtyard. The KES 1,500 ticket is worth it for the rotating house band and the easy shift from poems to dancefloor. Dress light and carry ID because entry is 18+ and parking along Parklands Road fills fast. The outdoor courtyard fills up by 9pm - arrive early for the good spots near the stage.",
+    },
+    {
+        "name": "Karura Twilight Trail Run",
+        "category_slug": "outdoors-and-active",
+        "venue": "Karura Forest",
+        "schedule": ("hours", 4, None),
+        "duration_days": 0,
+        "is_free": False,
+        "ticketing_enabled": True,
+        "curator_note": "Carry a headlamp even if the route starts before sunset. The final forest section gets dark faster than most first-timers expect.",
+        "curator_name": "Kamau, Pursuit",
+        "description": "A guided 8K twilight loop winds through Karura Forest from the Limuru Road side. The KES 800 entry keeps the group small, with pacers for social runners and a quick stretch circle after the finish. Bring trail shoes, a headlamp, and your own water bottle because the kiosks close early. The marshland path gets slippery after afternoon rain, so do not wear brand-new road shoes.",
+    },
+    {
+        "name": "Spring Valley Street Food Sundowner",
+        "category_slug": "food-and-drink",
+        "venue": "Spring Valley Community Market",
+        "schedule": ("hours", 5, None),
+        "duration_days": 0,
+        "is_free": True,
+        "ticketing_enabled": False,
+        "curator_note": None,
+        "curator_name": "Pursuit team",
+        "description": "Spring Valley Community Market hosts a twilight food crawl with grills, coastal snacks, and small-batch drinks. Entry is free, which makes it a relaxed way to sample several Nairobi vendors without committing to one restaurant. Carry cash for the smaller stalls and a warm layer once the sun drops behind the tents. The best mshikaki queue is usually the quiet one tucked near the flower sellers.",
+    },
+    {
+        "name": "Blankets & Wine June Picnic",
+        "category_slug": "concerts-and-nightlife",
+        "venue": "Ngong Racecourse",
+        "schedule": ("weekend", 5, 14),
+        "duration_days": 0,
+        "is_free": False,
+        "ticketing_enabled": True,
+        "curator_note": "Set up slightly left of the sound desk for the best balance of stage view and space. The main gate queue moves slowly after 3pm.",
+        "curator_name": "Pursuit team",
+        "description": "Blankets & Wine returns to Ngong Racecourse with an outdoor lineup of Kenyan live acts and DJs. The KES 4,500 ticket buys a full afternoon-to-evening picnic rhythm rather than a rushed concert. Bring a kikapu, sunscreen, and a mat, but leave glass bottles at home because security checks are strict. The far food court lines are shorter than the ones nearest the main stage.",
+    },
+    {
+        "name": "Circle Art Saturday Preview",
+        "category_slug": "culture-and-arts",
+        "venue": "Circle Art Gallery",
+        "schedule": ("weekend", 5, 11),
+        "duration_days": 0,
+        "is_free": True,
+        "ticketing_enabled": False,
+        "curator_note": "Go in the first hour if you want quiet with the work. By noon the front room turns into a social stop-off.",
+        "curator_name": "Pursuit team",
+        "description": "Circle Art Gallery opens a Saturday preview of new painting and mixed-media work by East African artists. The free entry makes it easy to drop in, but the real draw is hearing gallery staff unpack the smaller pieces people often miss. Wear comfortable shoes and plan for street parking around Lavington. The back room usually has the strongest pieces even when the crowd gathers near the entrance.",
+    },
+    {
+        "name": "Karen Makers Morning",
+        "category_slug": "workshops-and-classes",
+        "venue": "The Hub Karen",
+        "schedule": ("weekend", 6, 10),
+        "duration_days": 0,
+        "is_free": False,
+        "ticketing_enabled": True,
+        "curator_note": None,
+        "curator_name": "Pursuit team",
+        "description": "A hands-on Sunday session at The Hub Karen pairs beginner pottery, textile stamping, and quick craft demos. The KES 2,200 ticket includes basic materials and enough guidance to leave with something finished. Wear clothes that can handle clay dust and arrive before the mall parking rush builds. The workshop tables near the garden side have the best natural light for photos.",
+    },
+    {
+        "name": "Spring Valley Craft & Plant Market",
+        "category_slug": "markets-and-popups",
+        "venue": "Spring Valley Community Market",
+        "schedule": ("weekend", 6, 12),
+        "duration_days": 0,
+        "is_free": True,
+        "ticketing_enabled": False,
+        "curator_note": None,
+        "curator_name": "Pursuit team",
+        "description": "Independent makers and plant vendors gather at Spring Valley Community Market for a slow Sunday browse. Entry is free and the stall mix leans practical, with ceramics, herbs, woven baskets, and kids' snacks. Carry a tote bag and small notes because several stalls still prefer cash for low-value purchases. The herb seedlings near the back sell out before lunch when the weather is good.",
+    },
+    {
+        "name": "Alliance Française African Film Night",
+        "category_slug": "talks-and-ideas",
+        "venue": "Alliance Française",
+        "schedule": ("days", 1, 19),
+        "duration_days": 0,
+        "is_free": False,
+        "ticketing_enabled": False,
+        "curator_note": "Sit closer than you think for the post-film Q&A. The courtyard chatter can swallow softer questions from the back rows.",
+        "curator_name": "Pursuit team",
+        "description": "Alliance Française hosts an evening screening followed by a conversation with Nairobi film programmers. The KES 1,000 ticket is good value because the Q&A often reveals the production stories behind the film. Carry a light jacket for the courtyard and check traffic into Westlands before leaving home. The cafe queue spikes right after credits, so order before the screening starts.",
+    },
+    {
+        "name": "Clay Forms Workshop at GoDown",
+        "category_slug": "workshops-and-classes",
+        "venue": "GoDown Arts Centre",
+        "schedule": ("days", 2, 18),
+        "duration_days": 0,
+        "is_free": False,
+        "ticketing_enabled": False,
+        "curator_note": None,
+        "curator_name": "Pursuit team",
+        "description": "GoDown Arts Centre runs a beginner clay workshop focused on small functional pieces and surface texture. The KES 3,000 fee covers materials, firing coordination, and a patient instructor who keeps the class moving. Wear sleeves you can roll up and avoid white shoes because the studio floor gets dusty. Ask for the corner table near the fan if Ngara is running warm that evening.",
+    },
+    {
+        "name": "Karura Family Bird Walk",
+        "category_slug": "outdoors-and-active",
+        "venue": "Karura Forest",
+        "schedule": ("days", 3, 7),
+        "duration_days": 0,
+        "is_free": False,
+        "ticketing_enabled": True,
+        "curator_note": None,
+        "curator_name": "Pursuit team",
+        "description": "A naturalist-led morning walk introduces families to Karura Forest's birds, trees, and quieter side trails. The KES 600 ticket keeps the pace gentle and includes a simple checklist for kids. Bring binoculars if you have them, closed shoes, and a snack for the waterfall stop. The early group usually sees more before cyclists and school groups arrive.",
+    },
+    {
+        "name": "Creative Economies Talk at PAWA254",
+        "category_slug": "talks-and-ideas",
+        "venue": "PAWA254",
+        "schedule": ("days", 4, 18),
+        "duration_days": 0,
+        "is_free": True,
+        "ticketing_enabled": False,
+        "curator_note": "Bring a notebook; the useful bits tend to come during audience questions, not the opening remarks.",
+        "curator_name": "Kamau, Pursuit",
+        "description": "PAWA254 hosts an open conversation on how Nairobi creatives price, publish, and protect their work. The free session is useful because it mixes photographers, writers, designers, and organizers in one room. Arrive early for a seat and expect a practical, phone-out note-taking crowd. The best networking usually happens outside by the stairs after the official close.",
+    },
+    {
+        "name": "GoDown Open Studios Weekend",
+        "category_slug": "culture-and-arts",
+        "venue": "GoDown Arts Centre",
+        "schedule": ("days", 15, 10),
+        "duration_days": 2,
+        "is_free": False,
+        "ticketing_enabled": False,
+        "curator_note": None,
+        "curator_name": "Pursuit team",
+        "description": "GoDown Arts Centre opens studio doors for a two-day look at works in progress, installations, and artist conversations. The KES 2,500 pass is strongest for people who like process as much as finished exhibitions. Wear comfortable shoes and give yourself enough time to move between studios without rushing. The quieter morning slots are when artists are most likely to talk through unfinished work.",
+    },
+    {
+        "name": "Cultiva Farm Brunch Table",
+        "category_slug": "food-and-drink",
+        "venue": "Cultiva Farm",
+        "schedule": ("days", 17, 11),
+        "duration_days": 0,
+        "is_free": False,
+        "ticketing_enabled": True,
+        "curator_note": "Book the earlier seating if you can. Tigoni mist clears slowly and the farm looks best before the afternoon crowd arrives.",
+        "curator_name": "Pursuit team",
+        "description": "Cultiva Farm hosts a long-table brunch built around seasonal produce, grilled plates, and slow Tigoni views. The KES 6,500 ticket is premium, but the farm setting and full menu make it feel like a proper day out. Carry a light sweater and plan your ride home before the second seating ends. The road in can be muddy after rain, so low cars should take it slowly.",
+    },
+    {
+        "name": "Museum After Hours: Nairobi Then",
+        "category_slug": "culture-and-arts",
+        "venue": "Nairobi National Museum",
+        "schedule": ("days", 20, 18),
+        "duration_days": 0,
+        "is_free": False,
+        "ticketing_enabled": True,
+        "curator_note": None,
+        "curator_name": "Pursuit team",
+        "description": "Nairobi National Museum opens after hours for guided rooms, archive stories, and a short courtyard performance. The KES 2,800 ticket works well for anyone who wants culture without a full-day museum plan. Bring a jacket and use the main museum parking rather than circling Museum Hill late. The guide near the railway photos usually has the sharpest Nairobi trivia.",
+    },
+    {
+        "name": "Alchemist Vinyl Night Market",
+        "category_slug": "markets-and-popups",
+        "venue": "Alchemist Bar",
+        "schedule": ("days", 23, 16),
+        "duration_days": 0,
+        "is_free": False,
+        "ticketing_enabled": False,
+        "curator_note": "Dig through the crates before sundown. The rare Kenyan pressings disappear before the DJs start pulling a crowd.",
+        "curator_name": "Pursuit team",
+        "description": "Alchemist Bar turns its courtyard into a vinyl, fashion, and zine pop-up with DJs threading the afternoon together. The KES 1,200 ticket fits the market-meets-night-out format and keeps the vendor lineup curated. Bring cash for records and check sleeves carefully before buying. The best secondhand jackets are usually on the rail closest to the pizza counter.",
+    },
+    {
+        "name": "Nairobi to Coast Travel Clinic",
+        "category_slug": "travel",
+        "venue": "Nairobi National Museum",
+        "schedule": ("days", 25, 14),
+        "duration_days": 0,
+        "is_free": False,
+        "ticketing_enabled": True,
+        "curator_note": "Useful if you are planning coast travel around real Nairobi schedules. Ask about the morning SGR buffer; it saves more trips than any packing hack.",
+        "curator_name": "Pursuit team",
+        "description": "Travel planners and coastal guides break down realistic Nairobi-to-Mombasa weekend routes, budgets, and stops. The KES 2,000 ticket is practical if you are trying to avoid vague advice and overpacked itineraries. Bring your calendar, route questions, and a sense of your budget before the planning clinic starts. The SGR timing tips are the part people end up photographing.",
+    },
+    {
+        "name": "Ngong Racecourse Open-Air Afrobeats",
+        "category_slug": "concerts-and-nightlife",
+        "venue": "Ngong Racecourse",
+        "schedule": ("days", 29, 17),
+        "duration_days": 0,
+        "is_free": False,
+        "ticketing_enabled": True,
+        "curator_note": None,
+        "curator_name": "Pursuit team",
+        "description": "A large outdoor Afrobeats bill brings Nairobi DJs and guest performers to Ngong Racecourse. The KES 8,000 VIP tier is for people who want shorter bar lines and a cleaner stage view. Dress for grass, carry ID, and plan a cab pickup away from the main gate. The sound is clearer from the middle lawn than from the food trucks.",
+    },
+    {
+        "name": "Lavington Collectors Salon",
+        "category_slug": "culture-and-arts",
+        "venue": "Circle Art Gallery",
+        "schedule": ("days", 32, 18),
+        "duration_days": 0,
+        "is_free": False,
+        "ticketing_enabled": True,
+        "curator_note": "Do not be shy about asking prices. The smaller works are where new collectors usually find the most interesting entry points.",
+        "curator_name": "Pursuit team",
+        "description": "Circle Art Gallery hosts an evening salon for new collectors, artists, and curators around contemporary East African work. The KES 3,500 ticket includes a guided walkthrough and a low-pressure introduction to buying art. Dress smart casual and arrive with questions rather than a fixed shopping list. The strongest conversations happen around the unframed works table.",
+    },
+    {
+        "name": "Tigoni Weekend Escape Planning Lab",
+        "category_slug": "travel",
+        "venue": "Cultiva Farm",
+        "schedule": ("days", 36, 10),
+        "duration_days": 0,
+        "is_free": False,
+        "ticketing_enabled": True,
+        "curator_note": None,
+        "curator_name": "Pursuit team",
+        "description": "Cultiva Farm hosts a small planning lab for quick Tigoni, Limuru, and tea-country weekend escapes. The KES 4,000 ticket includes brunch bites, route templates, and local operator recommendations. Bring a laptop or notebook and a realistic transport plan for your group. The back-road route suggestions are more useful than the obvious highway stops.",
+    },
+    {
+        "name": "PAWA254 Podcast Sprint",
+        "category_slug": "workshops-and-classes",
+        "venue": "PAWA254",
+        "schedule": ("days", 40, 9),
+        "duration_days": 2,
+        "is_free": False,
+        "ticketing_enabled": True,
+        "curator_note": None,
+        "curator_name": "Pursuit team",
+        "description": "PAWA254 runs a two-day podcast sprint covering format, recording, editing, and publishing basics. The KES 3,200 ticket is aimed at beginners who want to leave with a pilot segment, not just notes. Bring headphones, a charged laptop, and one episode idea you can test in class. The quietest recording corner is upstairs before the afternoon sessions begin.",
+    },
+]
+
+
+NEW_NAIROBI_EVENTS = [
+    {
+        "name": "Jazz Mondays at Alchemist: Horns in the Courtyard",
+        "category_slug": "concerts-and-nightlife",
+        "venue": "Alchemist Bar",
+        "schedule": ("days", 7, 20),
+        "duration_days": 0,
+        "price": Decimal("1200"),
+        "ticketing_enabled": True,
+        "available_tickets": 5,
+        "going_count": 196,
+        "series_name": "Jazz Mondays at Alchemist",
+        "has_gallery": False,
+        "description": "Alchemist Bar hosts a Monday jazz set built around horns, keys, and a rotating rhythm section. The KES 1,200 ticket keeps the room intimate and gives the band space to stretch beyond the usual covers. Carry ID, dress for the outdoor courtyard, and avoid driving if you plan to stay for the late DJ handover. The best sound is just behind the first row of planters, not right against the stage.",
+    },
+    {
+        "name": "Jazz Mondays at Alchemist: Nairobi Standards",
+        "category_slug": "concerts-and-nightlife",
+        "venue": "Alchemist Bar",
+        "schedule": ("days", 14, 20),
+        "duration_days": 0,
+        "price": Decimal("1500"),
+        "ticketing_enabled": False,
+        "available_tickets": None,
+        "going_count": 214,
+        "series_name": "Jazz Mondays at Alchemist",
+        "has_gallery": False,
+        "description": "The second Jazz Mondays session at Alchemist leans into Nairobi standards, soul, and loose late-night improvisation. The KES 1,500 cover is worth it if you like sets that feel different by the final chorus. Book a cab, bring a jacket, and use the external event link for door details. The courtyard fills after nearby office dinners, so the sweet spot is arriving just before 8pm.",
+    },
+    {
+        "name": "Blankets & Wine Sunset Edition",
+        "category_slug": "concerts-and-nightlife",
+        "venue": "Ngong Racecourse",
+        "schedule": ("days", 34, 15),
+        "duration_days": 0,
+        "price": Decimal("5500"),
+        "ticketing_enabled": True,
+        "available_tickets": 120,
+        "going_count": 438,
+        "series_name": "Blankets & Wine",
+        "has_gallery": True,
+        "gallery_description": "A photo set from past picnic concerts and open-air performances. Includes crowd blankets, stage moments, food vendors, and golden-hour views across the racecourse.",
+        "description": "Blankets & Wine brings a sunset-leaning outdoor edition to Ngong Racecourse with live bands and guest DJs. The KES 5,500 ticket is premium, but the setting works for a full picnic afternoon that rolls into night. Bring a mat, sunscreen, and a warm layer because the field cools quickly after sundown. The easiest exit is usually through the less crowded gate near the food vendors.",
+    },
+    {
+        "name": "Karura Forest Dawn Photography Walk",
+        "category_slug": "outdoors-and-active",
+        "venue": "Karura Forest",
+        "schedule": ("hours", 3, None),
+        "duration_days": 0,
+        "price": Decimal("900"),
+        "ticketing_enabled": True,
+        "available_tickets": 35,
+        "going_count": 74,
+        "has_gallery": False,
+        "description": "A guided dawn walk through Karura Forest focuses on light, texture, birds, and quiet landscape photography. The KES 900 ticket is friendly for beginners and includes route guidance from a photographer who knows the forest gates well. Bring a charged phone or camera, closed shoes, and a flask because the cafes are not open at the start. The early mist near the caves disappears fast once the sun clears the trees.",
+    },
+    {
+        "name": "Cultiva Smokehouse Long Lunch",
+        "category_slug": "food-and-drink",
+        "venue": "Cultiva Farm",
+        "schedule": ("weekend", 5, 13),
+        "duration_days": 0,
+        "price": Decimal("6500"),
+        "ticketing_enabled": True,
+        "available_tickets": 42,
+        "going_count": 156,
+        "has_gallery": False,
+        "description": "Cultiva Farm hosts a smokehouse-style long lunch built around seasonal produce and slow-cooked plates. The KES 6,500 ticket is premium, but it feels like a countryside reset without leaving the Nairobi orbit. Carry a sweater, plan transport back from Tigoni, and wear shoes that can handle a farm path. The earlier seating gets the better valley light and a calmer kitchen rhythm.",
+    },
+    {
+        "name": "Spring Valley Breakfast Market",
+        "category_slug": "food-and-drink",
+        "venue": "Spring Valley Community Market",
+        "schedule": ("weekend", 6, 9),
+        "duration_days": 0,
+        "price": Decimal("0"),
+        "ticketing_enabled": False,
+        "available_tickets": None,
+        "going_count": 129,
+        "has_gallery": False,
+        "description": "Spring Valley Community Market starts early with breakfast plates, bakery stalls, coffee, and fresh produce. Free entry makes it an easy Sunday plan for families and anyone doing a proper pantry run. Carry a tote and small notes because the best stalls move quickly. The mandazi tray near the coffee stand is usually gone before 10:30am.",
+    },
+    {
+        "name": "Circle Art Night Viewing",
+        "category_slug": "culture-and-arts",
+        "venue": "Circle Art Gallery",
+        "schedule": ("days", 9, 18),
+        "duration_days": 0,
+        "price": Decimal("2500"),
+        "ticketing_enabled": True,
+        "available_tickets": 0,
+        "going_count": 88,
+        "has_gallery": True,
+        "gallery_description": "A gallery set showing installation details, wall texts, and opening-night moments. Includes close-ups of works and the Lavington gallery rooms after dark.",
+        "description": "Circle Art Gallery opens for an evening viewing of contemporary painting, sculpture, and works on paper. The KES 2,500 ticket is aimed at people who want a slower walkthrough with curatorial context. Dress smart casual and plan for limited street parking in Lavington. The smaller works near the office corridor often reward a second pass.",
+    },
+    {
+        "name": "Museum Courtyard History Salon",
+        "category_slug": "talks-and-ideas",
+        "venue": "Nairobi National Museum",
+        "schedule": ("days", 4, 18),
+        "duration_days": 0,
+        "price": Decimal("0"),
+        "ticketing_enabled": False,
+        "available_tickets": None,
+        "going_count": 67,
+        "has_gallery": False,
+        "description": "Nairobi National Museum hosts a courtyard salon on city memory, architecture, and old photographs. Free entry makes it a smart after-work stop for anyone curious about how Nairobi keeps changing. Bring a notebook and use the main museum parking before the evening traffic thickens. The best questions usually come from older attendees who remember the buildings being discussed.",
+    },
+    {
+        "name": "PAWA254 Poster-Making Sprint",
+        "category_slug": "workshops-and-classes",
+        "venue": "PAWA254",
+        "schedule": ("days", 12, 10),
+        "duration_days": 0,
+        "price": Decimal("2200"),
+        "ticketing_enabled": True,
+        "available_tickets": 28,
+        "going_count": 93,
+        "has_gallery": False,
+        "description": "PAWA254 runs a hands-on poster-making sprint for campaign graphics, gig flyers, and community notices. The KES 2,200 ticket is useful because participants leave with a finished print-ready layout. Bring a laptop if you have one and one message you want to turn into a poster. The downstairs wall examples are worth studying before the first exercise starts.",
+    },
+    {
+        "name": "The Hub Karen Kids Coding Lab",
+        "category_slug": "workshops-and-classes",
+        "venue": "The Hub Karen",
+        "schedule": ("days", 24, 11),
+        "duration_days": 0,
+        "price": Decimal("3000"),
+        "ticketing_enabled": True,
+        "available_tickets": 36,
+        "going_count": 112,
+        "has_gallery": False,
+        "description": "The Hub Karen hosts a beginner coding lab for kids using small games and visual programming exercises. The KES 3,000 ticket includes facilitator support and enough structure for first-timers. Bring a laptop, charger, and a packed snack for the mid-session break. Parents who wait nearby usually get the quietest seats near the bookstore side.",
+    },
+    {
+        "name": "GoDown Design Pop-Up Weekend",
+        "category_slug": "markets-and-popups",
+        "venue": "GoDown Arts Centre",
+        "schedule": ("days", 22, 11),
+        "duration_days": 2,
+        "price": Decimal("700"),
+        "ticketing_enabled": False,
+        "available_tickets": None,
+        "going_count": 173,
+        "has_gallery": False,
+        "description": "GoDown Arts Centre gathers furniture makers, illustrators, textile studios, and small publishers for a two-day design pop-up. The KES 700 entry keeps the crowd intentional while still leaving room to browse slowly. Carry cash, a tote, and measurements if you are shopping for home pieces. The best one-off prints usually sit in flat files rather than on the front tables.",
+    },
+    {
+        "name": "Alliance Française Francophone Film Weekend",
+        "category_slug": "travel",
+        "venue": "Alliance Française",
+        "schedule": ("days", 31, 17),
+        "duration_days": 2,
+        "price": Decimal("2500"),
+        "ticketing_enabled": False,
+        "available_tickets": None,
+        "going_count": 141,
+        "has_gallery": False,
+        "description": "Alliance Française screens a weekend of Francophone films that travel through West Africa, the Maghreb, and the Indian Ocean. The KES 2,500 pass is a compact way to get a cultural travel fix without leaving Westlands. Use the external link for the film schedule and carry a light jacket for the courtyard intervals. The cafe conversations between screenings are often better than the official introductions.",
+    },
+]
+
+# Payment flow test events — not for production
+PAYMENT_TEST_EVENTS = [
+    {
+        "name": "[TEST] Free + External",
+        "old_names": ["[TEST] Free + External Link"],
+        "category_slug": "concerts-and-nightlife",
+        "venue": "Alchemist Bar",
+        "price": Decimal("0"),
+        "ticketing_enabled": False,
+        "available_tickets": None,
+        "more_details_url": "https://pursuit.app/demo",
+        "has_gallery": False,
+    },
+    {
+        "name": "[TEST] M-Pesa KES 100",
+        "old_names": ["[TEST] M-Pesa Standard"],
+        "category_slug": "talks-and-ideas",
+        "venue": "GoDown Arts Centre",
+        "price": Decimal("100"),
+        "ticketing_enabled": True,
+        "available_tickets": 100,
+        "more_details_url": None,
+        "has_gallery": False,
+    },
+    {
+        "name": "[TEST] Mid Ticket",
+        "old_names": [],
+        "category_slug": "culture-and-arts",
+        "venue": "Circle Art Gallery",
+        "price": Decimal("1500"),
+        "ticketing_enabled": True,
+        "available_tickets": 100,
+        "more_details_url": None,
+        "has_gallery": False,
+    },
+    {
+        "name": "[TEST] Premium Ticket",
+        "old_names": [],
+        "category_slug": "concerts-and-nightlife",
+        "venue": "Ngong Racecourse",
+        "price": Decimal("3500"),
+        "ticketing_enabled": True,
+        "available_tickets": 100,
+        "more_details_url": None,
+        "has_gallery": False,
+    },
+    {
+        "name": "[TEST] Sold Out",
+        "old_names": [],
+        "category_slug": "workshops-and-classes",
+        "venue": "PAWA254",
+        "price": Decimal("800"),
+        "ticketing_enabled": True,
+        "available_tickets": 0,
+        "more_details_url": None,
+        "has_gallery": False,
+    },
+    {
+        "name": "[TEST] Gallery Event",
+        "old_names": ["[TEST] Gallery + External"],
+        "category_slug": "culture-and-arts",
+        "venue": "Nairobi National Museum",
+        "price": Decimal("0"),
+        "ticketing_enabled": False,
+        "available_tickets": None,
+        "more_details_url": "https://pursuit.app/demo",
+        "has_gallery": True,
+        "gallery_description": "Test gallery for verifying the gallery UI component.",
+    },
+]
+
+TEST_EVENT_DESCRIPTION = "Test event for Pursuit payment and UI flow testing. Not a real event."
+
+
+def _fallback_image_url(category_slug, index):
+    return f"{FALLBACK_IMAGE_URLS[category_slug]}?auto=format&fit=crop&q=80&w=1080&v={index + 1}"
+
+
+def _category_slug_for_event(event):
+    category = event.category.first()
+    if not category:
+        return "travel"
+    return next((slug for slug, name in CATEGORY_NAMES_BY_SLUG.items() if name == category.name), "travel")
+
+
+def _price_from_text(text):
+    match = re.search(r"KES\s*([0-9,]+)", text or "", re.IGNORECASE)
+    if not match:
+        return Decimal("0")
+    return Decimal(match.group(1).replace(",", ""))
+
+
+def _going_count(name, index):
+    return 12 + ((sum(ord(char) for char in name) + index * 37) % 439)
+
+
+def _series_name(name):
+    lower_name = name.lower()
+    if "blankets & wine" in lower_name:
+        return "Blankets & Wine"
+    if "jazz mondays" in lower_name:
+        return "Jazz Mondays at Alchemist"
+    if "monday" in lower_name or "weekly" in lower_name:
+        return name
+    return None
+
+
+def _gallery_description(name):
+    return (
+        f"A curated set of photos from previous editions and related moments around {name}. "
+        "Includes venue details, crowd scenes, and the kind of atmosphere guests can expect."
+    )
+
+
+def _should_have_gallery(event, existing_gallery_count):
+    if existing_gallery_count >= 3:
+        return False
+    text = f"{event.name} {event.description or ''}".lower()
+    return any(word in text for word in ("exhibition", "festival", "gallery", "open studios", "museum", "art week"))
+
+
+def _venue_link(location_name):
+    venue = (location_name or "").split(",")[0].strip()
+    return EXTERNAL_LINKS.get(venue, "https://pursuit.app/demo")
+
+
 class Command(BaseCommand):
     help = "Seed the database with 80+ events across all categories"
 
@@ -838,6 +1430,190 @@ class Command(BaseCommand):
         if not categories:
             self.stderr.write(self.style.ERROR("No categories found. Run load_initial_data first."))
             return
+
+        curated_events = []
+        updated_existing_count = 0
+        created_new_count = 0
+        test_event_count = 0
+        images_count = 0
+        galleries_count = 0
+
+        if not os.environ.get("UNSPLASH_ACCESS_KEY"):
+            self.stdout.write(
+                self.style.WARNING(
+                    "UNSPLASH_ACCESS_KEY not set — using fallback images.\n"
+                    "Run python manage.py seed_images after adding the key to fetch real images."
+                )
+            )
+
+        existing_gallery_count = 0
+        for index, event in enumerate(Event.objects.exclude(name__contains="[TEST]").prefetch_related("category")):
+            category_slug = _category_slug_for_event(event)
+            price = event.price or _price_from_text(f"{event.name} {event.description}")
+            ticketing_enabled = bool(price > 0 and not event.more_details_url)
+            update_fields = {
+                "price": price,
+                "ticketing_enabled": ticketing_enabled,
+                "available_tickets": 20 + (index * 11 % 181) if ticketing_enabled else None,
+                "going_count": event.going_count or _going_count(event.name, index),
+                "series_name": event.series_name or _series_name(event.name),
+            }
+            if not event.more_details_url and not ticketing_enabled and index < 4:
+                update_fields["more_details_url"] = _venue_link(event.location_name)
+            if not event.image:
+                update_fields["image"] = fetch_unsplash_image_url(category_slug)
+                images_count += 1
+            if not event.has_gallery and _should_have_gallery(event, existing_gallery_count):
+                update_fields["has_gallery"] = True
+                update_fields["gallery_images"] = fetch_unsplash_gallery_images(category_slug, 3)
+                update_fields["gallery_description"] = _gallery_description(event.name)
+                existing_gallery_count += 1
+                galleries_count += 1
+
+            for field, value in update_fields.items():
+                setattr(event, field, value)
+            event.save(update_fields=[*update_fields.keys(), "is_free", "updated_at"])
+            updated_existing_count += 1
+
+        for index, event_data in enumerate([*GENERATED_NAIROBI_EVENTS, *NEW_NAIROBI_EVENTS]):
+            venue_data = VENUES[event_data["venue"]]
+            category_name = CATEGORY_NAMES_BY_SLUG[event_data["category_slug"]]
+            category = categories.get(category_name)
+            if not category:
+                self.stdout.write(self.style.WARNING(f"Category '{category_name}' not found — skipping."))
+                continue
+
+            start = _generated_start(event_data["schedule"])
+            duration_days = event_data["duration_days"]
+            end = start + timedelta(days=duration_days) if duration_days else None
+            more_details_url = None
+            if not event_data["ticketing_enabled"]:
+                more_details_url = EXTERNAL_LINKS.get(event_data["venue"], "https://pursuit.app/demo")
+            price = event_data.get("price", _price_from_text(event_data["description"]))
+            has_gallery = event_data.get("has_gallery", False)
+
+            event, created = Event.objects.update_or_create(
+                name=event_data["name"],
+                defaults={
+                    "description": event_data["description"],
+                    "date": start,
+                    "end_date": end,
+                    "location_name": f"{event_data['venue']}, {venue_data['neighborhood']}",
+                    "location": venue_data["point"],
+                    "timezone": "Africa/Nairobi",
+                    "more_details_url": more_details_url,
+                    "price": price,
+                    "ticketing_enabled": event_data["ticketing_enabled"],
+                    "available_tickets": (
+                        event_data.get("available_tickets") if event_data["ticketing_enabled"] and price > 0 else None
+                    ),
+                    "going_count": event_data.get("going_count", _going_count(event_data["name"], index)),
+                    "has_gallery": has_gallery,
+                    "gallery_description": event_data.get("gallery_description") if has_gallery else None,
+                    "series_name": event_data.get("series_name") or _series_name(event_data["name"]),
+                    "is_active": True,
+                },
+            )
+            event.category.set([category])
+            if not event.image:
+                event.image = fetch_unsplash_image_url(event_data["category_slug"])
+                event.save(update_fields=["image"])
+                images_count += 1
+            if has_gallery and not event.gallery_images:
+                event.gallery_images = fetch_unsplash_gallery_images(event_data["category_slug"], 3)
+                event.save(update_fields=["gallery_images"])
+                galleries_count += 1
+            curated_events.append((event, event_data))
+            if created and event_data in NEW_NAIROBI_EVENTS:
+                created_new_count += 1
+
+        test_start = timezone.localtime(timezone.now()).replace(hour=12, minute=0, second=0, microsecond=0) + timedelta(
+            days=2
+        )
+        for index, event_data in enumerate(PAYMENT_TEST_EVENTS):
+            venue_data = VENUES[event_data["venue"]]
+            category_name = CATEGORY_NAMES_BY_SLUG[event_data["category_slug"]]
+            category = categories.get(category_name)
+            if not category:
+                self.stdout.write(self.style.WARNING(f"Category '{category_name}' not found — skipping."))
+                continue
+            existing_old_event = Event.objects.filter(name__in=event_data.get("old_names", [])).first()
+            if existing_old_event:
+                existing_old_event.name = event_data["name"]
+                existing_old_event.save(update_fields=["name", "updated_at"])
+
+            event, _created = Event.objects.update_or_create(
+                name=event_data["name"],
+                defaults={
+                    "description": TEST_EVENT_DESCRIPTION,
+                    "date": test_start + timedelta(days=index),
+                    "end_date": None,
+                    "location_name": f"{event_data['venue']}, {venue_data['neighborhood']}",
+                    "location": venue_data["point"],
+                    "timezone": "Africa/Nairobi",
+                    "more_details_url": event_data["more_details_url"],
+                    "price": event_data["price"],
+                    "ticketing_enabled": event_data["ticketing_enabled"],
+                    "available_tickets": event_data["available_tickets"],
+                    "going_count": _going_count(event_data["name"], index),
+                    "has_gallery": event_data["has_gallery"],
+                    "gallery_description": event_data.get("gallery_description"),
+                    "series_name": None,
+                    "is_active": True,
+                },
+            )
+            event.category.set([category])
+            if event_data["has_gallery"] and not event.gallery_images:
+                event.gallery_images = fetch_unsplash_gallery_images(event_data["category_slug"], 3)
+                event.save(update_fields=["gallery_images"])
+                galleries_count += 1
+            test_event_count += 1
+
+        strongest_picks = [
+            ("Jazz & Spoken Word at Alchemist", "nairobi", 0, 7),
+            ("Nairobi to Coast Travel Clinic", "mombasa", 0, 7),
+            ("Blankets & Wine June Picnic", "nairobi", 7, 14),
+        ]
+        editors_pick_count = 0
+        now = timezone.localtime(timezone.now()).replace(microsecond=0)
+        for event_name, location_tag, active_from_days, active_until_days in strongest_picks:
+            event_data = next((data for event, data in curated_events if event.name == event_name), None)
+            event = next((event for event, data in curated_events if event.name == event_name), None)
+            if not event or not event_data or not event_data["curator_note"]:
+                self.stdout.write(
+                    self.style.WARNING(f"Generated event '{event_name}' not found for Editor's Pick — skipping.")
+                )
+                continue
+
+            active_from = now + timedelta(days=active_from_days)
+            active_until = now + timedelta(days=active_until_days)
+            existing_pick = EditorsPick.objects.filter(
+                location_tag=location_tag,
+                active_from__date=active_from.date(),
+            ).first()
+            defaults = {
+                "event": event,
+                "active_from": active_from,
+                "active_until": active_until,
+                "curator_note": event_data["curator_note"],
+                "curator_name": event_data["curator_name"],
+                "position": 1,
+            }
+            if existing_pick:
+                for field, value in defaults.items():
+                    setattr(existing_pick, field, value)
+                existing_pick.save(update_fields=[*defaults.keys(), "updated_at"])
+            else:
+                EditorsPick.objects.create(location_tag=location_tag, **defaults)
+            editors_pick_count += 1
+
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"Updated {updated_existing_count} existing events, created {created_new_count} new events, "
+                f"{images_count} with images fetched this run, {galleries_count} with galleries, "
+                f"{test_event_count} test events, {editors_pick_count} EditorsPick records"
+            )
+        )
 
         created_count = 0
         skipped_count = 0
@@ -912,27 +1688,42 @@ class Command(BaseCommand):
                         event.category.add(cat)
                 near_term_count += 1
 
-        self.stdout.write(self.style.SUCCESS(
-            f"Seeded {created_count} events ({skipped_count} already existed), "
-            f"{near_term_count} near-term events."
-        ))
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"Seeded {created_count} events ({skipped_count} already existed), "
+                f"{near_term_count} near-term events."
+            )
+        )
 
         # --- Seed Editor's Picks ---
-        from apps.events.models import EditorsPick
-
         picks_data = [
             # Nairobi - active now
-            ("Wildlife Photography Masterclass", "nairobi", 0, 14,
-             "Nakuru National Park offers some of East Africa\u2019s most stunning wildlife backdrops \u2014 this workshop is a rare chance to learn from award-winning pros who know every corner of the park. Perfect for serious hobbyists and aspiring pros alike.",
-             "Amani, Pursuit Editor"),
+            (
+                "Wildlife Photography Masterclass",
+                "nairobi",
+                0,
+                14,
+                "Nakuru National Park offers some of East Africa\u2019s most stunning wildlife backdrops \u2014 this workshop is a rare chance to learn from award-winning pros who know every corner of the park. Perfect for serious hobbyists and aspiring pros alike.",
+                "Amani, Pursuit Editor",
+            ),
             # Mombasa - active now
-            ("Mombasa Street Food Festival", "mombasa", 0, 14,
-             "The coastal street food scene is unlike anywhere else in Kenya \u2014 come hungry and expect biryani that rivals Zanzibar\u2019s best. The viazi karai alone is worth the trip.",
-             "Joy, Pursuit Food Editor"),
+            (
+                "Mombasa Street Food Festival",
+                "mombasa",
+                0,
+                14,
+                "The coastal street food scene is unlike anywhere else in Kenya \u2014 come hungry and expect biryani that rivals Zanzibar\u2019s best. The viazi karai alone is worth the trip.",
+                "Joy, Pursuit Food Editor",
+            ),
             # Kisumu - active in 2 weeks
-            ("Kisumu Fish Festival", "kisumu", 14, 21,
-             "Lake Victoria\u2019s fishing heritage comes alive in this two-day lakeside celebration. Don\u2019t miss the omena tastings \u2014 crispy, fresh, and served with ugali on the shore.",
-             "Kofi, Pursuit Culture Editor"),
+            (
+                "Kisumu Fish Festival",
+                "kisumu",
+                14,
+                21,
+                "Lake Victoria\u2019s fishing heritage comes alive in this two-day lakeside celebration. Don\u2019t miss the omena tastings \u2014 crispy, fresh, and served with ugali on the shore.",
+                "Kofi, Pursuit Culture Editor",
+            ),
         ]
 
         picks_created = 0
@@ -956,7 +1747,7 @@ class Command(BaseCommand):
                     "curator_note": curator_note,
                     "curator_name": curator_name,
                     "position": 1,
-                }
+                },
             )
 
             if created:
@@ -970,9 +1761,9 @@ class Command(BaseCommand):
                 pick.save(update_fields=["active_from", "active_until", "curator_note", "curator_name"])
                 picks_skipped += 1
 
-        self.stdout.write(self.style.SUCCESS(
-            f"Seeded {picks_created} Editor's Picks ({picks_skipped} already existed)."
-        ))
+        self.stdout.write(
+            self.style.SUCCESS(f"Seeded {picks_created} Editor's Picks ({picks_skipped} already existed).")
+        )
 
         # --- Scenario setup for test user ---
         test_user = User.objects.filter(email="faithcathy12@gmail.com").first()

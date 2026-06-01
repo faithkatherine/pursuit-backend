@@ -17,6 +17,49 @@ class Event(models.Model):
     location_name = models.CharField(max_length=255, null=True, blank=True)
     location = models.PointField(null=True, blank=True, geography=True, srid=4326)
     more_details_url = models.URLField(null=True, blank=True)
+    price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        help_text="Ticket price in KES. 0 for free events.",
+    )
+    ticketing_enabled = models.BooleanField(
+        default=False,
+        help_text="True if tickets are sold in-app. False if event links externally.",
+    )
+    available_tickets = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Remaining ticket count. Null for free or externally ticketed events.",
+    )
+    going_count = models.PositiveIntegerField(
+        default=0,
+        help_text="Number of users who have saved or are attending.",
+    )
+    has_gallery = models.BooleanField(
+        default=False,
+        help_text="True if this event has a gallery of images.",
+    )
+    gallery_images = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of image URLs for the event gallery.",
+    )
+    gallery_description = models.TextField(
+        null=True,
+        blank=True,
+        help_text="Description of the gallery content.",
+    )
+    series_name = models.CharField(
+        max_length=200,
+        null=True,
+        blank=True,
+        help_text=(
+            "Name of the recurring series this event belongs to. "
+            "e.g. 'Blankets & Wine'. Soft reference only — no FK. "
+            "Full series model is V2."
+        ),
+    )
     is_free = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -24,6 +67,10 @@ class Event(models.Model):
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+        self.is_free = self.price == 0
+        super().save(*args, **kwargs)
 
     def clean(self):
         super().clean()

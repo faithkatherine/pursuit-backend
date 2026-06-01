@@ -6,9 +6,11 @@ from django.contrib.gis.geos import Point
 from django.contrib.gis.measure import D
 from django.core.cache import cache
 from django.db.models import Exists, OuterRef, Q
+from django.utils import timezone
 from graphql import GraphQLError
 
-from .models import Event, UserEvents
+from .locations import location_tag_from_coords
+from .models import EditorsPick, Event, UserEvents
 from .signals import EVENTS_CACHE_VERSION_KEY
 from .types import EventType
 
@@ -34,6 +36,49 @@ def _get_events_cache_version():
         cache.set(EVENTS_CACHE_VERSION_KEY, 1)
         version = 1
     return version
+
+
+def _get_user_location_tag(user):
+    if not user.is_authenticated:
+        return "nairobi"
+
+    profile = getattr(user, "profile", None)
+    if not profile:
+        return "nairobi"
+
+    if profile.allow_location_sharing and profile.coordinates:
+        lat, lon = profile.coordinates
+        effective_tag = location_tag_from_coords(lat, lon)
+        if profile.last_synced_location_tag != effective_tag:
+            profile.last_synced_location_tag = effective_tag
+            profile.save(update_fields=["last_synced_location_tag"])
+        return effective_tag
+
+    return profile.last_synced_location_tag or "nairobi"
+
+
+def _attach_active_editors_pick(event, user):
+    effective_tag = _get_user_location_tag(user)
+    editors_pick = (
+        EditorsPick.objects.filter(
+            event=event,
+            location_tag=effective_tag,
+            active_from__lte=timezone.now(),
+            active_until__gte=timezone.now(),
+            position=1,
+        )
+        .order_by("-active_from")
+        .first()
+    )
+
+    event._is_editors_pick = bool(editors_pick)
+    if editors_pick:
+        event._reason = "Editor's pick"
+        event._source = "editorial"
+        event._curator_note = editors_pick.curator_note
+        event._curator_name = editors_pick.curator_name
+
+    return event
 
 
 class EventsListPayload(graphene.ObjectType):
@@ -252,5 +297,12 @@ class EventsQueries(graphene.ObjectType):
 
         if not event.is_active:
             raise GraphQLError("Event not found.")
+
+        if info.context.user.is_authenticated:
+            event._is_saved = UserEvents.objects.filter(
+                user=info.context.user, event=event
+            ).exists()
+
+        _attach_active_editors_pick(event, info.context.user)
 
         return EventPayload(ok=True, event=event)
