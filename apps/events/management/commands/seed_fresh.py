@@ -21,6 +21,7 @@ from apps.events.utils.unsplash import (
     fetch_unsplash_image_url,
 )
 from apps.itinerary.models import Trip
+from apps.organizers.models import OrganizerProfile
 from apps.users.models import User
 
 
@@ -40,6 +41,11 @@ class Command(BaseCommand):
 
             self.stdout.write(self.style.SUCCESS("✓ Flushed all event data\n"))
 
+            # Seed organizer
+            self.stdout.write("👤 Creating organizer...")
+            organizer = self._seed_organizer()
+            self.stdout.write(self.style.SUCCESS(f"✓ Created organizer: {organizer.business_name}\n"))
+
             # Seed categories
             self.stdout.write("📂 Creating categories...")
             categories = self._seed_categories()
@@ -47,7 +53,7 @@ class Command(BaseCommand):
 
             # Seed events
             self.stdout.write("🎉 Creating events...")
-            events = self._seed_events(categories)
+            events = self._seed_events(categories, organizer)
             self.stdout.write(self.style.SUCCESS(f"✓ Created {len(events)} events\n"))
 
             # Seed user interactions
@@ -71,6 +77,29 @@ class Command(BaseCommand):
                 )
             )
 
+    def _seed_organizer(self):
+        """Create a default organizer for seeded events"""
+        # Get or create a default organizer user
+        user, _ = User.objects.get_or_create(
+            email="organizer@pursuitapp.co.ke",
+            defaults={
+                "first_name": "Pursuit",
+                "last_name": "Events",
+                "is_active": True,
+            }
+        )
+
+        # Create organizer profile
+        organizer, _ = OrganizerProfile.objects.get_or_create(
+            user=user,
+            defaults={
+                "business_name": "Pursuit Events HQ",
+                "verified": True,
+            }
+        )
+
+        return organizer
+
     def _seed_categories(self):
         """Create the 8 core categories"""
         # Map slug to category data for easier lookup
@@ -92,7 +121,7 @@ class Command(BaseCommand):
 
         return categories
 
-    def _seed_events(self, categories):
+    def _seed_events(self, categories, organizer):
         """Create 50 diverse events across all categories and time ranges"""
         nairobi_tz = pytz.timezone("Africa/Nairobi")
         now = timezone.now().astimezone(nairobi_tz)
@@ -945,6 +974,7 @@ class Command(BaseCommand):
             event, created = Event.objects.update_or_create(
                 name=data["name"],
                 defaults={
+                    "organizer": organizer,
                     "description": data["description"],
                     "date": start_date,
                     "end_date": end_date,
