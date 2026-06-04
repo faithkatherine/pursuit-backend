@@ -7,6 +7,7 @@ from apps.users.models import User
 
 # Create your models here.
 class Event(models.Model):
+    organizer = models.ForeignKey("organizers.OrganizerProfile", on_delete=models.PROTECT, related_name="events")
     name = models.CharField(max_length=255, unique=True, null=False, blank=False)
     description = models.TextField(null=True, blank=True)
     category = models.ManyToManyField("core.Category", blank=True, related_name="events")
@@ -64,6 +65,15 @@ class Event(models.Model):
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    status = models.CharField(max_length=20, choices=[
+        ('draft', 'Draft'),
+        ('live', 'Live'),
+        ('cancelled', 'Cancelled'),   # triggers payout freeze + refunds
+        ('ended', 'Ended'),           # event date passed, payouts released
+    ], default='draft')
+
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    cancellation_reason = models.CharField(max_length=255, null=True, blank=True)
 
     def __str__(self):
         return self.name

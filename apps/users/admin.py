@@ -9,14 +9,14 @@ from .models import LoginAttempt, RefreshToken, User, UserProfile, UserSession
 class UserAdmin(BaseUserAdmin):
     """Custom user admin"""
 
-    list_display = ["email", "first_name", "last_name", "is_active", "is_staff", "date_joined", "last_login"]
+    list_display = [ "id" ,"email", "first_name", "last_name", "is_active", "is_staff", "date_joined", "last_login"]
     list_filter = ["is_active", "is_staff", "is_superuser", "auth_provider", "is_email_verified"]
     search_fields = ["email", "first_name", "last_name", "username"]
     ordering = ["-date_joined"]
     readonly_fields = ["id", "date_joined", "updated_at", "last_login_at"]
 
     fieldsets = (
-        (None, {"fields": ("username", "email", "password")}),
+        (None, {"fields": ("id", "username", "email", "password")}),
         (_("Personal info"), {"fields": ("first_name", "last_name", "profile_picture")}),
         (_("Authentication"), {"fields": ("auth_provider", "provider_id")}),
         (
