@@ -41,6 +41,7 @@ DJANGO_APPS = [
 ]
 
 THIRD_PARTY_APPS = [
+    "rest_framework",
     "corsheaders",
     "graphene_django",
     "django_extensions",
@@ -176,6 +177,30 @@ JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_DELTA = 60 * 60  # 1 hour
 JWT_REFRESH_EXPIRATION_DELTA = 60 * 60 * 24 * 30  # 30 days
 
+# Django REST Framework Configuration
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.SessionAuthentication",  # For browsable API
+        "apps.users.authentication.JWTAuthentication",  # For mobile app
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+    "DEFAULT_RENDERER_CLASSES": [
+        "rest_framework.renderers.JSONRenderer",
+        "rest_framework.renderers.BrowsableAPIRenderer",  # Enables web UI
+    ],
+    "DEFAULT_PARSER_CLASSES": [
+        "rest_framework.parsers.JSONParser",
+        "rest_framework.parsers.FormParser",
+        "rest_framework.parsers.MultiPartParser",
+    ],
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 20,
+    "EXCEPTION_HANDLER": "rest_framework.views.exception_handler",
+    "TEST_REQUEST_DEFAULT_FORMAT": "json",
+}
+
 # CORS Configuration
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
@@ -265,3 +290,19 @@ DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "noreply@pursuit.com")
 # File Upload Settings
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
+
+# M-Pesa Daraja API Configuration
+MPESA_ENVIRONMENT = os.environ.get("MPESA_ENVIRONMENT", "sandbox")  # sandbox or production
+MPESA_CONSUMER_KEY = os.environ.get("MPESA_CONSUMER_KEY", "")
+MPESA_CONSUMER_SECRET = os.environ.get("MPESA_CONSUMER_SECRET", "")
+MPESA_SHORTCODE = os.environ.get("MPESA_SHORTCODE", "174379")  # Sandbox shortcode
+MPESA_PASSKEY = os.environ.get("MPESA_PASSKEY", "")
+MPESA_INITIATOR_NAME = os.environ.get("MPESA_INITIATOR_NAME", "")
+MPESA_SECURITY_CREDENTIAL = os.environ.get("MPESA_SECURITY_CREDENTIAL", "")
+
+# M-Pesa API URLs (auto-select based on environment)
+MPESA_BASE_URL = (
+    "https://api.safaricom.co.ke"
+    if MPESA_ENVIRONMENT == "production"
+    else "https://sandbox.safaricom.co.ke"
+)

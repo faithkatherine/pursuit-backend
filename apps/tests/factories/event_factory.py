@@ -5,22 +5,28 @@ from django.utils import timezone
 from factory.django import DjangoModelFactory
 
 from apps.events.models import Event, UserEvents
-from tests.factories.core_factory import CategoryFactory
-from tests.factories.user_factory import UserFactory
+from apps.tests.factories.core_factory import CategoryFactory
+from apps.tests.factories.user_factory import UserFactory
 
 
 class EventFactory(DjangoModelFactory):
     """
-    Creates an active, future-dated Event.
+    Creates an active, future-dated Event with an organizer.
 
     Usage:
         event = EventFactory()
         event = EventFactory(name="Jazz Night", is_free=True)
+        event = EventFactory(organizer=my_organizer)
         past_event = EventFactory(date=timezone.now() - timedelta(days=1))
     """
 
     class Meta:
         model = Event
+
+    # Lazy import to avoid circular dependency
+    organizer = factory.LazyAttribute(
+        lambda _: __import__('apps.tests.factories.organizer_factory', fromlist=['OrganizerProfileFactory']).OrganizerProfileFactory()
+    )
 
     name = factory.Sequence(lambda n: f"Event {n}")
     description = factory.Faker("paragraph")

@@ -7,6 +7,6 @@ are available to ALL test files regardless of their location (apps/, tests/, etc
 
 # Load shared fixture plugins globally
 pytest_plugins = [
-    "tests.fixtures.auth",
-    "tests.fixtures.db",
+    "apps.tests.fixtures.auth",
+    "apps.tests.fixtures.db",
 ]

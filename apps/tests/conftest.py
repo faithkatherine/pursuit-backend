@@ -28,7 +28,7 @@ from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 
 from apps.users.authentication import JWTService
-from tests.factories.user_factory import UserFactory
+from apps.tests.factories.user_factory import UserFactory
 
 # Fixture plugins are registered in the root conftest.py so they apply
 # to tests in both tests/ and apps/ directories.

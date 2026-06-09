@@ -64,6 +64,11 @@ class Order(models.Model):
 
     idempotency_key = models.CharField(max_length=64, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    paid_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When order status changed to 'paid' (triggers 24h payout countdown)"
+    )
 
     class Meta:
         ordering = ['-created_at']

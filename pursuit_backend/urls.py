@@ -18,14 +18,36 @@ Including another URLconf
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
+from django.http import JsonResponse
 from django.urls import include, path
 from django.views.decorators.csrf import csrf_exempt
 from graphene_django.views import GraphQLView
 
+
+def api_root(request):
+    """API root endpoint showing available services"""
+    return JsonResponse({
+        'message': 'Pursuit API',
+        'version': '1.0',
+        'endpoints': {
+            'graphql': '/graphql/',
+            'admin': '/admin/',
+            'health': '/api/health/',
+            'payments': '/api/payments/',
+        },
+        'documentation': {
+            'payments': 'See PAYMENT_SYSTEM.md for payment API documentation',
+            'browsable_api': 'Payment endpoints support DRF browsable API (login via /admin/ first)',
+        }
+    })
+
+
 urlpatterns = [
+    path("", api_root, name="api-root"),
     path("admin/", admin.site.urls),
     path("graphql/", csrf_exempt(GraphQLView.as_view(graphiql=True))),
     path("api/health/", include("apps.core.urls")),
+    path("api/payments/", include("apps.payments.urls")),
 ]
 
 if settings.DEBUG:

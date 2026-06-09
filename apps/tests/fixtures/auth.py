@@ -1,8 +1,8 @@
 import pytest
 from django.contrib.gis.geos import Point
 
-from tests.factories.user_factory import UserFactory
-from tests.graphql.client import GraphQLClient
+from apps.tests.factories.user_factory import UserFactory
+from apps.tests.graphql.client import GraphQLClient
 
 
 @pytest.fixture
