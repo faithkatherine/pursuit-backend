@@ -1,0 +1,7 @@
+"""
+QUERIES
+"""
+type Query {
+  getCategories: CategoryListPayload!
+  getInterests: InterestListPayload!
+}

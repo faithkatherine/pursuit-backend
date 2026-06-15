@@ -1,0 +1,32 @@
+# Event Queries
+
+type Query {
+  """
+  Get a paginated list of active events with optional search and filters.
+  All filters combine with AND logic.
+  """
+  Events(
+    search: String
+    category: [ID]
+    dateFrom: DateTime
+    dateTo: DateTime
+    latitude: Float
+    longitude: Float
+    radiusKm: Float
+    isFree: Boolean
+    offset: Int
+    limit: Int
+  ): EventsListPayload!
+
+  """
+  Get a single active event by ID. Returns error for non-existent or inactive events.
+  """
+  Event(id: ID!): EventPayload!
+}
+
+type Mutation {
+  """
+  Create a new user event
+  """
+  saveEvent(id: ID!): UserEventPayload!
+}

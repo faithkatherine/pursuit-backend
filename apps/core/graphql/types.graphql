@@ -1,0 +1,30 @@
+"""
+GraphQL type definitions for the core app
+"""
+type Category {
+  id: ID!
+  name: String!
+  description: String
+  icon: String
+  color: String!
+  is_active: Boolean!
+  sort_order: Int!
+}
+
+type Interest {
+  id: ID!
+  name: String!
+  icon: String
+  description: String
+  category: Category
+}
+
+type CategoryListPayload {
+  ok: Boolean!
+  categories: [Category!]!
+}
+
+type InterestListPayload {
+  ok: Boolean!
+  interests: [Interest!]!
+}

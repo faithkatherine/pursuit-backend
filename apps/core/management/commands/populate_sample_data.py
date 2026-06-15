@@ -10,56 +10,48 @@ User = get_user_model()
 
 
 class Command(BaseCommand):
-    help = 'Populate database with sample data for demo'
+    help = "Populate database with sample data for demo"
 
     def handle(self, *args, **kwargs):
-        self.stdout.write('Starting to populate sample data...')
+        self.stdout.write("Starting to populate sample data...")
 
         # Create or get a demo user (or use existing authenticated user)
         user, created = User.objects.get_or_create(
-            email='demo@pursuit.com',
-            defaults={
-                'username': 'demo',
-                'first_name': 'Demo',
-                'last_name': 'User',
-                'is_active': True
-            }
+            email="demo@pursuit.com",
+            defaults={"username": "demo", "first_name": "Demo", "last_name": "User", "is_active": True},
         )
         if created:
-            user.set_password('demo123')
+            user.set_password("demo123")
             user.save()
-            self.stdout.write(self.style.SUCCESS(f'Created demo user: {user.email}'))
+            self.stdout.write(self.style.SUCCESS(f"Created demo user: {user.email}"))
 
         # Create categories
         categories_data = [
-            {"name": "Movies", "emoji": "🎬"},
-            {"name": "Books", "emoji": "📚"},
-            {"name": "Cooking", "emoji": "🍳"},
-            {"name": "Travelling", "emoji": "✈️"},
-            {"name": "Fitness", "emoji": "⚽"},
-            {"name": "Creativity", "emoji": "🎨"},
-            {"name": "Music", "emoji": "🎵"},
-            {"name": "Nature", "emoji": "🌿"},
+            {"name": "Movies", "icon": "🎬"},
+            {"name": "Books", "icon": "📚"},
+            {"name": "Cooking", "icon": "🍳"},
+            {"name": "Travelling", "icon": "✈️"},
+            {"name": "Fitness", "icon": "⚽"},
+            {"name": "Creativity", "icon": "🎨"},
+            {"name": "Music", "icon": "🎵"},
+            {"name": "Nature", "icon": "🌿"},
         ]
 
         categories = {}
         for cat_data in categories_data:
             cat, created = Category.objects.get_or_create(
-                name=cat_data["name"],
-                defaults={"emoji": cat_data["emoji"], "is_active": True}
+                name=cat_data["name"], defaults={"icon": cat_data["icon"], "is_active": True}
             )
             categories[cat_data["name"]] = cat
             if created:
-                self.stdout.write(f'Created category: {cat.name}')
+                self.stdout.write(f"Created category: {cat.name}")
 
         # Create bucket list for demo user
         bucket_list, created = BucketList.objects.get_or_create(
-            user=user,
-            is_default=True,
-            defaults={'name': 'My Bucket List', 'description': 'My adventure bucket list'}
+            user=user, is_default=True, defaults={"name": "My Bucket List", "description": "My adventure bucket list"}
         )
         if created:
-            self.stdout.write(self.style.SUCCESS('Created default bucket list'))
+            self.stdout.write(self.style.SUCCESS("Created default bucket list"))
 
         # Create bucket items
         bucket_items_data = [
@@ -242,10 +234,10 @@ class Command(BaseCommand):
                 defaults={
                     **item_data,
                     "category": category,
-                }
+                },
             )
 
-        self.stdout.write(self.style.SUCCESS(f'Created {len(bucket_items_data)} bucket items'))
+        self.stdout.write(self.style.SUCCESS(f"Created {len(bucket_items_data)} bucket items"))
 
         # Create recommendations
         recommendations_data = [
@@ -302,12 +294,9 @@ class Command(BaseCommand):
         ]
 
         for rec_data in recommendations_data:
-            Recommendation.objects.get_or_create(
-                title=rec_data["title"],
-                defaults=rec_data
-            )
+            Recommendation.objects.get_or_create(title=rec_data["title"], defaults=rec_data)
 
-        self.stdout.write(self.style.SUCCESS(f'Created {len(recommendations_data)} recommendations'))
+        self.stdout.write(self.style.SUCCESS(f"Created {len(recommendations_data)} recommendations"))
 
         # Create weather data
         weather_data = [
@@ -318,28 +307,25 @@ class Command(BaseCommand):
         ]
 
         for weather in weather_data:
-            WeatherData.objects.get_or_create(
-                city=weather["city"],
-                defaults=weather
-            )
+            WeatherData.objects.get_or_create(city=weather["city"], defaults=weather)
 
-        self.stdout.write(self.style.SUCCESS('Created weather data'))
+        self.stdout.write(self.style.SUCCESS("Created weather data"))
 
         # Create user insights
         insight, created = UserInsight.objects.get_or_create(
             user=user,
             defaults={
-                'total_bucket_items': 18,
-                'completed_items': 15,
-                'yearly_goal': 25,
-                'current_city': 'San Francisco',
-                'next_destination': 'Tokyo, Japan',
-                'days_to_next_trip': 14,
-                'recent_achievement': 'Completed hiking challenge',
-            }
+                "total_bucket_items": 18,
+                "completed_items": 15,
+                "yearly_goal": 25,
+                "current_city": "San Francisco",
+                "next_destination": "Tokyo, Japan",
+                "days_to_next_trip": 14,
+                "recent_achievement": "Completed hiking challenge",
+            },
         )
 
         if created:
-            self.stdout.write(self.style.SUCCESS('Created user insights'))
+            self.stdout.write(self.style.SUCCESS("Created user insights"))
 
-        self.stdout.write(self.style.SUCCESS('Sample data population completed!'))
+        self.stdout.write(self.style.SUCCESS("Sample data population completed!"))

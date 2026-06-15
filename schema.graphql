@@ -2,9 +2,10 @@
 type Query {
   user: UserType
   userProfile: UserProfileType
-  getInsightsData: InsightsDataType
-  getHome(offset: Int, limit: Int): HomeDataType
-  getRecommendations(offset: Int, limit: Int): [RecommendationType]
+  events(search: String, category: [ID], dateFrom: DateTime, dateTo: DateTime, latitude: Float, longitude: Float, radiusKm: Float, isFree: Boolean, offset: Int, limit: Int): EventsListPayload
+  event(id: ID!): EventPayload
+  savedEvents(offset: Int, limit: Int): EventsListPayload
+  getRecommendations(offset: Int, limit: Int): [EventType]
   getBucketCategories: [CategoryType]
   getBucketItems(categoryId: String): [BucketItemType]
 
@@ -61,13 +62,7 @@ type UserProfileType {
   bio: String!
 
   """City, State/Country display name"""
-  location: String!
-
-  """Latitude coordinate"""
-  homeLatitude: Decimal
-
-  """Longitude coordinate"""
-  homeLongitude: Decimal
+  locationName: String!
 
   """Default search radius for nearby events in kilometers"""
   searchRadiusKm: Int!
@@ -77,6 +72,7 @@ type UserProfileType {
   isOnboardingCompleted: Boolean!
   hasSkippedOnboarding: Boolean!
   isProfilePublic: Boolean!
+  allowLocationSharing: Boolean!
   allowEmailNotifications: Boolean!
   allowPushNotifications: Boolean!
   calendarIntegrated: Boolean!
@@ -95,9 +91,6 @@ type UserProfileType {
   hasLocation: Boolean
   isPremium: Boolean
 }
-
-"""The `Decimal` scalar type represents a python Decimal."""
-scalar Decimal
 
 """
 The `Date` scalar type represents a Date
@@ -151,98 +144,22 @@ type InterestType {
   name: String!
   description: String!
   icon: String
+  category: CategoryType
 }
 
-"""User session GraphQL type"""
-type UserSessionType {
-  id: UUID!
-  sessionToken: String!
-  deviceInfo: String!
-  ipAddress: String!
-  createdAt: DateTime!
-  lastActiveAt: DateTime!
-  isActive: Boolean!
-}
-
-"""GraphQL InsightsData type"""
-type InsightsDataType {
-  id: String
-  weather: WeatherType
-  nextDestination: DestinationType
-  progress: ProgressType
-  recentAchievement: String
-}
-
-"""GraphQL Weather type"""
-type WeatherType {
-  city: String
-  condition: String
-  temperature: Float
-}
-
-"""GraphQL Destination type"""
-type DestinationType {
-  location: String
-  daysAway: Int
-}
-
-"""GraphQL Progress type"""
-type ProgressType {
-  remaining: Int
-  completed: Int
-  yearlyGoal: Int
-  percentage: Int
-}
-
-"""GraphQL HomeData type"""
-type HomeDataType {
-  id: String
-  greeting: String
-  timeOfDay: String
-  weather: WeatherType
-  insights: InsightsDataType
-  bucketCategories: [CategoryType]
-  recommendations: [RecommendationType]
-  upcoming: [BucketItemType]
-}
-
-"""GraphQL Category type"""
 type CategoryType {
   id: UUID!
+  createdAt: DateTime!
+  updatedAt: DateTime!
   name: String!
-  emoji: String!
+  icon: String!
   description: String!
   color: String!
-}
-
-"""GraphQL Recommendation type"""
-type RecommendationType {
-  id: UUID!
-  createdAt: DateTime!
-  title: String!
-  description: String!
-  location: String!
-  recommendationType: RecommendationsRecommendationRecommendationTypeChoices!
-  estimatedCost: Decimal
-  rating: Float
-  amount: Float
-  date: String
-  image: String
-}
-
-"""An enumeration."""
-enum RecommendationsRecommendationRecommendationTypeChoices {
-  """Destination"""
-  DESTINATION
-
-  """Activity"""
-  ACTIVITY
-
-  """Experience"""
-  EXPERIENCE
-
-  """Event"""
-  EVENT
+  isActive: Boolean!
+  sortOrder: Int!
+  interests: [InterestType!]!
+  bucketItems: [BucketItemType!]!
+  events: [EventType!]!
 }
 
 """GraphQL BucketItem type"""
@@ -253,7 +170,7 @@ type BucketItemType {
   category: CategoryType
   title: String!
   description: String!
-  location: String!
+  locationName: String!
   estimatedCost: Decimal
   priority: BucketsBucketItemPriorityChoices!
   difficulty: BucketsBucketItemDifficultyChoices!
@@ -264,6 +181,9 @@ type BucketItemType {
   image: String
   categoryId: String
 }
+
+"""The `Decimal` scalar type represents a python Decimal."""
+scalar Decimal
 
 """An enumeration."""
 enum BucketsBucketItemPriorityChoices {
@@ -295,8 +215,86 @@ enum BucketsBucketItemDifficultyChoices {
   EXTREME
 }
 
+"""Event GraphQL type"""
+type EventType {
+  id: ID!
+  name: String!
+  description: String
+  category: [CategoryType!]!
+  date: DateTime!
+  endDate: DateTime
+  image: String
+  timezone: String
+  locationName: String
+  moreDetailsUrl: String
+  isFree: Boolean!
+  isActive: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  coordinates: [Float]
+  isSaved: Boolean
+  isEditorsPick: Boolean
+  reason: String
+  source: String
+  curatorNote: String
+  curatorName: String
+}
+
+"""User session GraphQL type"""
+type UserSessionType {
+  id: UUID!
+  sessionToken: String!
+  deviceInfo: String!
+  ipAddress: String!
+  createdAt: DateTime!
+  lastActiveAt: DateTime!
+  isActive: Boolean!
+}
+
+"""Response payload for paginated event list queries."""
+type EventsListPayload {
+  ok: Boolean!
+  events: [EventType!]!
+}
+
+"""Response payload for single event queries."""
+type EventPayload {
+  ok: Boolean!
+  event: EventType
+}
+
+"""Trip GraphQL type with cover_image fallback chain."""
+type TripType {
+  id: ID!
+  name: String!
+  destination: String!
+  startDate: DateTime!
+  endDate: DateTime!
+  image: String
+  events: [EventType!]!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  coverImage: String
+  eventCount: Int
+}
+
 """Root Mutation combining all app mutations"""
 type Mutation {
+  """Create a new trip."""
+  createTrip(destination: String!, endDate: DateTime!, eventIds: [ID], image: String, name: String!, startDate: DateTime!): TripPayload
+
+  """Add an event to an existing trip."""
+  addEventToTrip(eventId: ID!, tripId: ID!): TripPayload
+
+  """Remove an event from a trip."""
+  removeEventFromTrip(eventId: ID!, tripId: ID!): TripPayload
+
+  """Allow a user to save an event to their profile for later reference."""
+  saveEvent(id: ID!): SaveEventPayload
+
+  """Remove an event from the user's saved list."""
+  unsaveEvent(id: ID!): SaveEventPayload
+
   """Add bucket category mutation"""
   addBucketCategory(emoji: String, name: String!): AddBucketCategory
 
@@ -304,7 +302,10 @@ type Mutation {
   addBucketItem(categoryId: String, description: String, estimatedCost: Float, location: String, title: String!): AddBucketItem
 
   """Complete onboarding mutation"""
-  completeOnboarding(bio: String, interests: [String], location: String): CompleteOnboarding
+  completeOnboarding(allowEmailNotifications: Boolean, allowLocationSharing: Boolean, allowPushNotifications: Boolean, interests: [String], location: [Float], locationName: String): CompleteOnboarding
+
+  """Enable or update user location from home screen (post-onboarding)"""
+  enableLocation(location: [Float]!, locationName: String!): EnableLocation
 
   """Google sign in mutation - handles both sign up and sign in"""
   googleSignIn(idToken: String!): GoogleSignIn
@@ -330,6 +331,20 @@ type Mutation {
   skipOnboarding: SkipOnboarding
 }
 
+"""Response payload for trip mutations."""
+type TripPayload {
+  ok: Boolean!
+  trip: TripType
+  errors: [String!]
+}
+
+"""Response payload for save/unsave event mutations."""
+type SaveEventPayload {
+  ok: Boolean!
+  event: EventType
+  errors: [String!]
+}
+
 """Add bucket category mutation"""
 type AddBucketCategory {
   category: CategoryType
@@ -343,6 +358,13 @@ type AddBucketItem {
 """Complete onboarding mutation"""
 type CompleteOnboarding {
   ok: Boolean
+  user: UserType
+}
+
+"""Enable or update user location from home screen (post-onboarding)"""
+type EnableLocation {
+  ok: Boolean
+  user: UserType
 }
 
 """Google sign in mutation - handles both sign up and sign in"""

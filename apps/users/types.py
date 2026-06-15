@@ -13,6 +13,7 @@ from apps.users.models import UserSession as UserSessionModel
 
 class AuthPayloadType(graphene.ObjectType):
     """Standard auth response"""
+
     access_token = graphene.String(required=True)
     session_token = graphene.String(required=True)
     refresh_token = graphene.String(required=True)
@@ -25,7 +26,7 @@ class InterestType(DjangoObjectType):
 
     class Meta:
         model = InterestModel
-        fields = ('id', 'name', 'description', 'icon', 'category')
+        fields = ("id", "name", "description", "icon", "category")
 
 
 class UserProfileType(DjangoObjectType):
@@ -39,13 +40,29 @@ class UserProfileType(DjangoObjectType):
     class Meta:
         model = UserProfileModel
         fields = (
-            'bio', 'location_name',
-            'search_radius_km', 'timezone', 'birth_date', 'phone_number',
-            'is_onboarding_completed', 'has_skipped_onboarding', 'is_profile_public',
-            'allow_email_notifications', 'allow_push_notifications',
-            'calendar_integrated', 'calendar_provider', 'calendar_last_synced_at',
-            'payment_plan', 'subscription_expires_at', 'last_billing_date',
-            'last_active_at', 'login_count', 'theme', 'created_at', 'updated_at'
+            "bio",
+            "location_name",
+            "search_radius_km",
+            "timezone",
+            "birth_date",
+            "phone_number",
+            "is_onboarding_completed",
+            "has_skipped_onboarding",
+            "is_profile_public",
+            "allow_location_sharing",
+            "allow_email_notifications",
+            "allow_push_notifications",
+            "calendar_integrated",
+            "calendar_provider",
+            "calendar_last_synced_at",
+            "payment_plan",
+            "subscription_expires_at",
+            "last_billing_date",
+            "last_active_at",
+            "login_count",
+            "theme",
+            "created_at",
+            "updated_at",
         )
 
     def resolve_interests(self, info):
@@ -73,10 +90,7 @@ class UserSessionType(DjangoObjectType):
 
     class Meta:
         model = UserSessionModel
-        fields = (
-            'id', 'session_token', 'device_info', 'ip_address',
-            'created_at', 'last_active_at', 'is_active'
-        )
+        fields = ("id", "session_token", "device_info", "ip_address", "created_at", "last_active_at", "is_active")
 
 
 class UserType(DjangoObjectType):
@@ -91,9 +105,18 @@ class UserType(DjangoObjectType):
     class Meta:
         model = UserModel
         fields = (
-            'id', 'email', 'username', 'first_name', 'last_name',
-            'profile_picture', 'is_active', 'date_joined', 'updated_at',
-            'last_login_at', 'auth_provider', 'is_email_verified'
+            "id",
+            "email",
+            "username",
+            "first_name",
+            "last_name",
+            "profile_picture",
+            "is_active",
+            "date_joined",
+            "updated_at",
+            "last_login_at",
+            "auth_provider",
+            "is_email_verified",
         )
 
     def resolve_profile(self, info):
@@ -110,7 +133,7 @@ class UserType(DjangoObjectType):
 
     def resolve_active_sessions(self, info):
         """Return only active sessions for the user"""
-        return self.device_sessions.filter(is_active=True).order_by('-last_active_at')
+        return self.device_sessions.filter(is_active=True).order_by("-last_active_at")
 
     def resolve_session_count(self, info):
         """Return count of active sessions"""
