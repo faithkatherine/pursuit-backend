@@ -62,7 +62,7 @@ python manage.py create_superuser_from_env\n\
 # Seed events (only if SEED_EVENTS is set)\n\
 if [ "$SEED_EVENTS" = "true" ]; then\n\
   echo "Seeding events..."\n\
-  python manage.py seed_events\n\
+  python manage.py seed_fresh\n\
 fi\n\
 \n\
 # Start server\n\
