@@ -24,6 +24,14 @@ app.conf.beat_schedule = {
         'task': 'apps.users.tasks.cleanup_expired_tokens',
         'schedule': crontab(hour=2, minute=0),  # Run at 2:00 AM daily
     },
+    "refresh-events-cache": {
+        "task": "apps.events.tasks.refresh_events_cache",
+        "schedule": 300.0,  # Every 5 minutes (matches EVENTS_CACHE_TTL)
+    },
+    "cleanup-stale-event-caches-hourly": {
+        "task": "apps.events.tasks.cleanup_stale_event_caches",
+        "schedule": crontab(minute=0),  # Every hour on the hour
+    },
 }
 
 app.conf.timezone = 'UTC'

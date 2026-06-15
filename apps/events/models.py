@@ -21,6 +21,29 @@ class Event(models.Model):
     def __str__(self):
         return self.name
 
+    @property
+    def starting_price(self):
+        """Cheapest active tier price. Falls back to self.price."""
+        from django.db.models import Min
+        result = self.ticket_tiers.filter(
+            is_active=True
+        ).aggregate(min_price=Min('price'))
+        return result['min_price'] or self.price
+
+    @property
+    def total_available(self):
+        """Sum of available tickets across active tiers."""
+        from django.db.models import Sum
+        result = self.ticket_tiers.filter(
+            is_active=True
+        ).aggregate(total=Sum('available'))
+        return result['total'] if result['total'] is not None \
+            else self.available_tickets
+
+    def save(self, *args, **kwargs):
+        self.is_free = self.price == 0
+        super().save(*args, **kwargs)
+
     def clean(self):
         super().clean()
         if self.end_date and self.end_date < self.date:
@@ -31,7 +54,96 @@ class Event(models.Model):
         verbose_name_plural = 'Events'
         ordering = ['date']
         indexes = [
-            models.Index(fields=['date']),
-            models.Index(fields=['location']),
-            models.Index(fields=['is_active', 'date']),
+            models.Index(fields=["date"]),
+            models.Index(fields=["location"]),
+            models.Index(fields=["is_active", "date"]),
+            models.Index(fields=["is_free", "date"]),
         ]
+
+
+class EditorsPick(models.Model):
+    """Curated Editor's Pick events scoped by location tag"""
+
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name="editors_picks")
+    location_tag = models.CharField(
+        max_length=100, db_index=True, help_text="Location scope for this pick (e.g., 'nairobi', 'mombasa')"
+    )
+    active_from = models.DateTimeField(help_text="When this pick becomes active")
+    active_until = models.DateTimeField(help_text="When this pick expires")
+    curator_note = models.TextField(help_text="Required editorial note explaining why this event is featured")
+    curator_name = models.CharField(
+        max_length=100,
+        blank=True,
+        default="Pursuit team",
+        help_text="Attribution for the curator (e.g., 'Pursuit team', 'Jane Doe')",
+    )
+    position = models.PositiveSmallIntegerField(
+        default=1, help_text="Reserved for future multi-pick surfaces; v1 always uses position=1"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-active_from", "position"]
+        verbose_name = "Editor's Pick"
+        verbose_name_plural = "Editor's Picks"
+        indexes = [
+            models.Index(fields=["location_tag", "active_from"]),
+            models.Index(fields=["active_from", "active_until"]),
+        ]
+
+    def save(self, *args, **kwargs):
+        # Normalize location_tag for reliable matching
+        if self.location_tag:
+            self.location_tag = self.location_tag.strip().lower()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.event.name} — {self.location_tag} ({self.active_from.date()})"
+
+
+class TicketTier(models.Model):
+    """Ticket tier for events with multiple pricing levels"""
+
+    event = models.ForeignKey(
+        'Event',
+        on_delete=models.PROTECT,
+        related_name='ticket_tiers'
+    )
+    name = models.CharField(max_length=100)
+    description = models.CharField(max_length=255, blank=True)
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+    capacity = models.PositiveIntegerField()
+    available = models.PositiveIntegerField()
+    is_active = models.BooleanField(default=True)
+    sort_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['sort_order', 'price']
+        unique_together = [['event', 'name']]
+        verbose_name = "Ticket Tier"
+        verbose_name_plural = "Ticket Tiers"
+
+    def __str__(self):
+        return f"{self.event.name} — {self.name} (KES {self.price})"
+
+
+class UserEvents(models.Model):
+    """Track user interactions with events for personalization"""
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="saved_events")
+    event = models.ForeignKey("events.Event", on_delete=models.CASCADE, related_name="user_interactions")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "users_user_events"
+        verbose_name = _("User's Saved Event")
+        verbose_name_plural = _("User's Saved Events")
+        indexes = [
+            models.Index(fields=["user"]),
+            models.Index(fields=["event"]),
+        ]
+        unique_together = ("user", "event")
+
+    def __str__(self):
+        return f"{self.user.email} saved {self.event.name}"

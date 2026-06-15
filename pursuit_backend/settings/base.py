@@ -40,19 +40,27 @@ DJANGO_APPS = [
 ]
 
 THIRD_PARTY_APPS = [
-    'corsheaders',
-    'graphene_django',
-    'django_extensions',
-    'django_filters',
+    "rest_framework",
+    "drf_spectacular",
+    "corsheaders",
+    "graphene_django",
+    "django_extensions",
+    "django_filters",
+    "cloudinary_storage",
+    "cloudinary",
 ]
 
 LOCAL_APPS = [
-    'apps.users',
-    'apps.core',
-    'apps.buckets',
-    'apps.recommendations',
-    'apps.insights',
-    'apps.events',
+    "apps.users",
+    "apps.core",
+    "apps.buckets",
+    "apps.recommendations",
+    "apps.insights",
+    "apps.events",
+    "apps.itinerary",
+    "apps.organizers",
+    "apps.payments",
+    "apps.tickets",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -158,12 +166,50 @@ JWT_ALGORITHM = 'HS256'
 JWT_EXPIRATION_DELTA = 60 * 60  # 1 hour
 JWT_REFRESH_EXPIRATION_DELTA = 60 * 60 * 24 * 30  # 30 days
 
+# Django REST Framework Configuration
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.SessionAuthentication",  # For browsable API
+        "apps.users.authentication.JWTAuthentication",  # For mobile app
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+    "DEFAULT_RENDERER_CLASSES": [
+        "rest_framework.renderers.JSONRenderer",
+        "rest_framework.renderers.BrowsableAPIRenderer",  # Enables web UI
+    ],
+    "DEFAULT_PARSER_CLASSES": [
+        "rest_framework.parsers.JSONParser",
+        "rest_framework.parsers.FormParser",
+        "rest_framework.parsers.MultiPartParser",
+    ],
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 20,
+    "EXCEPTION_HANDLER": "rest_framework.views.exception_handler",
+    "TEST_REQUEST_DEFAULT_FORMAT": "json",
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+}
+
+# drf-spectacular Configuration
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Pursuit API",
+    "DESCRIPTION": "Nairobi event discovery and ticketing platform",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "COMPONENT_SPLIT_REQUEST": True,
+}
+
 # CORS Configuration
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://localhost:8081",
     "http://127.0.0.1:8081",
+]
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://motivator-eclipse-nervy.ngrok-free.dev",
 ]
 
 CORS_ALLOW_CREDENTIALS = True

@@ -1,0 +1,410 @@
+openapi: 3.0.3
+info:
+  title: Pursuit API
+  version: 1.0.0
+  description: Nairobi event discovery and ticketing platform
+paths:
+  /api/health/:
+    get:
+      operationId: health_retrieve
+      description: Health check endpoint
+      tags:
+      - health
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/payments/:
+    get:
+      operationId: payments_retrieve
+      description: |-
+        # Pursuit Payment API
+
+        M-Pesa payment system for event tickets.
+
+        ## Available Endpoints:
+
+        - `POST /api/payments/initiate/` - Initiate STK Push payment
+        - `GET /api/payments/status/<checkout_request_id>/` - Check payment status
+        - `POST /api/payments/payout/initiate/` - Initiate organizer payout (Admin only)
+        - `POST /api/payments/reversal/initiate/` - Initiate transaction reversal (Admin only)
+
+        ## Callback Endpoints (M-Pesa use only):
+
+        - `POST /api/payments/mpesa/callback/` - STK Push callback
+        - `POST /api/payments/mpesa/b2c-callback/` - B2C payout callback
+        - `POST /api/payments/mpesa/b2b-callback/` - B2B payout callback
+        - `POST /api/payments/mpesa/reversal-callback/` - Reversal callback
+
+        ## Authentication:
+
+        - User endpoints require JWT token: `Authorization: Bearer <token>`
+        - For testing in browser: Login via Django admin first
+
+        ## Testing:
+
+        See PAYMENT_SYSTEM.md for complete API documentation and test scenarios.
+      tags:
+      - payments
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/payments/initiate/:
+    post:
+      operationId: payments_initiate_create
+      description: 'Acquires a Redis lock, creates a pending order with ticket reservations,
+        and fires an STK Push to the user''s phone. All money flows to Pursuit''s
+        shortcode. Model B pricing: buyer pays face value, platform fee deducted from
+        organizer payout.'
+      summary: Initiate M-Pesa STK Push for event tickets
+      tags:
+      - payments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InitiatePaymentRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InitiatePaymentRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InitiatePaymentRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+          description: ''
+        '400':
+          description: Invalid phone / sold out / already purchased / tier not found
+        '429':
+          description: Payment already in progress — retry after 10 seconds
+        '503':
+          description: Daraja unavailable
+  /api/payments/orders/{order_id}/:
+    get:
+      operationId: payments_orders_retrieve
+      description: |-
+        GET /api/payments/orders/{order_id}/
+
+        Retrieve order details with ticket items (for confirmation screen).
+
+        ## Response (Success):
+        ```json
+        {
+            "id": "abc123",
+            "subtotal": "3500.00",
+            "platform_fee": "70.00",
+            "total": "3500.00",
+            "status": "paid",
+            "items": [
+                {
+                    "tier_name": "General Admission",
+                    "quantity": 2,
+                    "unit_price": "1500.00",
+                    "subtotal": "3000.00"
+                },
+                {
+                    "tier_name": "VIP",
+                    "quantity": 1,
+                    "unit_price": "500.00",
+                    "subtotal": "500.00"
+                }
+            ]
+        }
+        ```
+
+        ## Notes:
+        - User can only view their own orders
+        - Returns 403 if order belongs to different user
+        - Returns 404 if order does not exist
+      summary: Get order details with ticket items
+      parameters:
+      - in: path
+        name: order_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - payments
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+          description: ''
+  /api/payments/payout/initiate/:
+    post:
+      operationId: payments_payout_initiate_create
+      description: |-
+        POST /api/payments/payout/initiate/
+
+        Manually trigger a specific payout (admin only).
+      summary: Manually trigger organizer payout (admin only)
+      tags:
+      - admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InitiatePayoutRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InitiatePayoutRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InitiatePayoutRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Payout initiated
+  /api/payments/reversal/initiate/:
+    post:
+      operationId: payments_reversal_initiate_create
+      description: |-
+        POST /api/payments/reversal/initiate/
+
+        Initiates refund for a paid order (admin only).
+      summary: Initiate transaction reversal (admin only)
+      tags:
+      - admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InitiateReversalRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InitiateReversalRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InitiateReversalRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Reversal initiated
+        '400':
+          description: Order not paid
+  /api/payments/status/{checkout_request_id}/:
+    get:
+      operationId: payments_status_retrieve
+      description: 'Poll every 3 seconds. Status: pending|paid|failed|expired'
+      summary: Poll payment status
+      parameters:
+      - in: path
+        name: checkout_request_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - payments
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentStatusResponse'
+          description: ''
+components:
+  schemas:
+    InitiatePaymentRequest:
+      type: object
+      description: Request serializer for POST /api/payments/initiate/
+      properties:
+        phone_number:
+          type: string
+          minLength: 1
+          description: Phone number in any format (0712..., 254712..., +254712...)
+          maxLength: 20
+        event_id:
+          type: string
+          format: uuid
+          description: Event UUID
+        tiers:
+          type: array
+          items:
+            $ref: '#/components/schemas/TierSelectionRequest'
+          description: List of tier selections
+      required:
+      - event_id
+      - phone_number
+      - tiers
+    InitiatePayoutRequest:
+      type: object
+      description: Request serializer for POST /api/payments/payout/initiate/
+      properties:
+        payout_id:
+          type: integer
+          description: OrganizerPayout ID to process
+      required:
+      - payout_id
+    InitiateReversalRequest:
+      type: object
+      description: Request serializer for POST /api/payments/reversal/initiate/
+      properties:
+        order_id:
+          type: string
+          format: uuid
+          description: Order UUID to refund
+      required:
+      - order_id
+    OrderItem:
+      type: object
+      description: Serializer for order line items
+      properties:
+        tier_name:
+          type: string
+          readOnly: true
+        quantity:
+          type: integer
+          readOnly: true
+        unit_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          readOnly: true
+          description: Price snapshot at time of order creation (immutable)
+        subtotal:
+          type: string
+          readOnly: true
+      required:
+      - quantity
+      - subtotal
+      - tier_name
+      - unit_price
+    OrderResponse:
+      type: object
+      description: |-
+        Response serializer for order creation
+
+        Note: checkout_request_id and resuming are added manually by the view
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        subtotal:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          readOnly: true
+          description: Ticket price × quantity (base amount before any adjustments)
+        platform_fee:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          readOnly: true
+          description: Platform fee deducted from organizer payout (NOT added to buyer
+            total in Model B)
+        total:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          readOnly: true
+          description: Final amount buyer pays (equals subtotal in Model B; leaves
+            room for discounts in V2)
+        status:
+          allOf:
+          - $ref: '#/components/schemas/OrderResponseStatusEnum'
+          readOnly: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+          readOnly: true
+        checkout_request_id:
+          type: string
+          readOnly: true
+        resuming:
+          type: string
+          readOnly: true
+      required:
+      - checkout_request_id
+      - id
+      - items
+      - platform_fee
+      - resuming
+      - status
+      - subtotal
+      - total
+    OrderResponseStatusEnum:
+      enum:
+      - pending
+      - paid
+      - failed
+      - expired
+      - refunded
+      type: string
+      description: |-
+        * `pending` - Pending
+        * `paid` - Paid
+        * `failed` - Failed
+        * `expired` - Expired
+        * `refunded` - Refunded
+    PaymentStatusResponse:
+      type: object
+      description: Response serializer for payment status
+      properties:
+        status:
+          $ref: '#/components/schemas/PaymentStatusResponseStatusEnum'
+        order_id:
+          type: string
+          format: uuid
+        mpesa_receipt:
+          type: string
+          nullable: true
+      required:
+      - mpesa_receipt
+      - order_id
+      - status
+    PaymentStatusResponseStatusEnum:
+      enum:
+      - pending
+      - paid
+      - failed
+      - expired
+      - refunded
+      type: string
+      description: |-
+        * `pending` - pending
+        * `paid` - paid
+        * `failed` - failed
+        * `expired` - expired
+        * `refunded` - refunded
+    TierSelectionRequest:
+      type: object
+      description: Individual tier selection within an order
+      properties:
+        tier_id:
+          type: integer
+        quantity:
+          type: integer
+          minimum: 0
+      required:
+      - quantity
+      - tier_id
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid
