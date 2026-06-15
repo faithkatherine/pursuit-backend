@@ -7,8 +7,8 @@ Usage: python manage.py seed_fresh
 
 from datetime import datetime, timedelta
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
-import pytz
 from django.contrib.gis.geos import Point
 from django.core.management.base import BaseCommand
 from django.db import transaction
@@ -123,7 +123,7 @@ class Command(BaseCommand):
 
     def _seed_events(self, categories, organizer):
         """Create 50 diverse events across all categories and time ranges"""
-        nairobi_tz = pytz.timezone("Africa/Nairobi")
+        nairobi_tz = ZoneInfo("Africa/Nairobi")
         now = timezone.now().astimezone(nairobi_tz)
 
         events_data = [
@@ -1129,8 +1129,6 @@ class Command(BaseCommand):
         import random
 
         now = timezone.now()
-        nairobi_tz = pytz.timezone("Africa/Nairobi")
-
         # Get travel events for trips
         travel_events = [e for e in events if e.category.first() and e.category.first().name == "Travel"]
 

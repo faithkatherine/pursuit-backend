@@ -1,7 +1,7 @@
 from datetime import timedelta
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import graphene
-import pytz
 from django.utils import timezone
 
 from apps.core.models import Category
@@ -49,9 +49,9 @@ def _get_time_bucket(user_timezone="UTC"):
         user_timezone: User's timezone string (e.g., 'Africa/Nairobi', 'America/New_York')
     """
     try:
-        tz = pytz.timezone(user_timezone)
-    except (pytz.UnknownTimeZoneError, AttributeError):
-        tz = pytz.UTC
+        tz = ZoneInfo(user_timezone)
+    except (ZoneInfoNotFoundError, AttributeError):
+        tz = ZoneInfo("UTC")
 
     now_in_user_tz = timezone.now().astimezone(tz)
     hour = now_in_user_tz.hour
@@ -95,9 +95,9 @@ def _get_greeting_prompt(user_id=None, user_timezone="UTC"):
     options = _SUBTITLE_SETS[bucket]
 
     try:
-        tz = pytz.timezone(user_timezone)
-    except (pytz.UnknownTimeZoneError, AttributeError):
-        tz = pytz.UTC
+        tz = ZoneInfo(user_timezone)
+    except (ZoneInfoNotFoundError, AttributeError):
+        tz = ZoneInfo("UTC")
 
     now_in_user_tz = timezone.now().astimezone(tz)
     date_str = (
@@ -142,9 +142,9 @@ def _get_time_of_day(user_timezone="UTC"):
         user_timezone: User's timezone string
     """
     try:
-        tz = pytz.timezone(user_timezone)
-    except (pytz.UnknownTimeZoneError, AttributeError):
-        tz = pytz.UTC
+        tz = ZoneInfo(user_timezone)
+    except (ZoneInfoNotFoundError, AttributeError):
+        tz = ZoneInfo("UTC")
 
     now_in_user_tz = timezone.now().astimezone(tz)
     hour = now_in_user_tz.hour
@@ -163,9 +163,9 @@ def _get_day_of_week(user_timezone="UTC"):
         user_timezone: User's timezone string
     """
     try:
-        tz = pytz.timezone(user_timezone)
-    except (pytz.UnknownTimeZoneError, AttributeError):
-        tz = pytz.UTC
+        tz = ZoneInfo(user_timezone)
+    except (ZoneInfoNotFoundError, AttributeError):
+        tz = ZoneInfo("UTC")
 
     now_in_user_tz = timezone.now().astimezone(tz)
     return now_in_user_tz.strftime("%A")
