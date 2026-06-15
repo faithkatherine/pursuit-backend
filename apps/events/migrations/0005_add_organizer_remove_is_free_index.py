@@ -1,4 +1,4 @@
-# Generated migration for organizer field and removing is_free index
+# Generated migration for organizer field compatibility.
 
 import django.db.models.deletion
 from django.db import migrations, models
@@ -12,13 +12,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        # Remove the is_free index first
-        migrations.RemoveIndex(
-            model_name='event',
-            name='events_even_is_free_5e8c44_idx',
-        ),
-        # Add organizer field
-        migrations.AddField(
+        migrations.AlterField(
             model_name='event',
             name='organizer',
             field=models.ForeignKey(
@@ -26,7 +20,7 @@ class Migration(migrations.Migration):
                 on_delete=django.db.models.deletion.PROTECT,
                 related_name='events',
                 to='organizers.organizerprofile',
-                null=True,  # Allow null temporarily for migration
+                null=True,
             ),
         ),
     ]
