@@ -1,5 +1,6 @@
 from django.contrib.gis.db import models
 from django.core.exceptions import ValidationError
+from apps.users.models import User
 
 
 # Create your models here.
