@@ -162,6 +162,7 @@ class EditorsPick(models.Model):
     def __str__(self):
         return f"{self.event.name} — {self.location_tag} ({self.active_from.date()})"
 
+
 class TicketTier(models.Model):
     """Ticket tier for events with multiple pricing levels"""
 

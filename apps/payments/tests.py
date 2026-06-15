@@ -1,21 +1,18 @@
-import pytest
 from decimal import Decimal
+
+import pytest
 from django.db.models import ProtectedError
 
-from apps.payments.models import Order, MPESATransaction
 from apps.organizers.models import OrganizerPayout
-from apps.tests.factories.payment_factory import (
-    OrderFactory,
-    MPESATransactionFactory,
-    OrganizerPayoutWithOrderFactory
-)
-from apps.tests.factories.user_factory import UserFactory
+from apps.payments.models import MPESATransaction, Order
 from apps.tests.factories.event_factory import EventFactory
-
+from apps.tests.factories.payment_factory import MPESATransactionFactory, OrderFactory, OrganizerPayoutWithOrderFactory
+from apps.tests.factories.user_factory import UserFactory
 
 # ============================================================================
 # ORDER MODEL TESTS
 # ============================================================================
+
 
 @pytest.mark.django_db
 class TestOrder:

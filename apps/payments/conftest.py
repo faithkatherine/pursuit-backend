@@ -4,9 +4,10 @@ Pytest configuration and shared fixtures for payment tests.
 All Daraja API mocks are defined here to ensure consistency across all tests.
 """
 
-import pytest
 from decimal import Decimal
 from unittest.mock import patch
+
+import pytest
 
 PLATFORM_FEE_RATE = Decimal('0.02')
 

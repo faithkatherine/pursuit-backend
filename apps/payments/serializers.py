@@ -7,7 +7,7 @@ All payment views use DRF serializers for request/response validation.
 from rest_framework import serializers
 
 from apps.events.models import TicketTier
-from apps.payments.models import MPESATransaction, Order, OrderItem
+from apps.payments.models import Order, OrderItem
 from apps.tickets.serializers import TicketSummarySerializer
 
 

@@ -1,7 +1,7 @@
-import factory
 import uuid
 from decimal import Decimal
 
+import factory
 from django.utils import timezone
 from factory.django import DjangoModelFactory
 

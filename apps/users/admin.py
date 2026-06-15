@@ -9,7 +9,7 @@ from .models import LoginAttempt, RefreshToken, User, UserProfile, UserSession
 class UserAdmin(BaseUserAdmin):
     """Custom user admin"""
 
-    list_display = [ "id" ,"email", "first_name", "last_name", "is_active", "is_staff", "date_joined", "last_login"]
+    list_display = ["id", "email", "first_name", "last_name", "is_active", "is_staff", "date_joined", "last_login"]
     list_filter = ["is_active", "is_staff", "is_superuser", "auth_provider", "is_email_verified"]
     search_fields = ["email", "first_name", "last_name", "username"]
     ordering = ["-date_joined"]
@@ -76,7 +76,17 @@ class UserProfileAdmin(admin.ModelAdmin):
         (_("Profile"), {"fields": ("user", "bio", "birth_date", "phone_number")}),
         (_("Location"), {"fields": ("location_name", "location", "search_radius_km", "timezone")}),
         (_("Onboarding"), {"fields": ("has_skipped_onboarding", "is_onboarding_completed", "interests")}),
-        (_("Privacy"), {"fields": ("is_profile_public", "allow_location_sharing", "allow_email_notifications", "allow_push_notifications")}),
+        (
+            _("Privacy"),
+            {
+                "fields": (
+                    "is_profile_public",
+                    "allow_location_sharing",
+                    "allow_email_notifications",
+                    "allow_push_notifications",
+                )
+            },
+        ),
         (
             _("Calendar"),
             {

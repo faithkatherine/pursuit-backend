@@ -2,3 +2,9 @@
 max-line-length = 120
 exclude = venv,migrations,__pycache__
 extend-ignore = E203
+per-file-ignores =
+    apps/events/management/commands/seed_fresh.py:E501,F401,F841
+    apps/**/tests.py:F401,F841,E501
+    apps/**/test_*.py:F401,F841,E501
+    apps/tests/*.py:F401,F841,E501
+    apps/tests/**/*.py:F401,F841,E501

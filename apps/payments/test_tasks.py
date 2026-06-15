@@ -8,17 +8,17 @@ Tests background tasks mentioned in pursuit_payment_architecture.md:
 4. retry_failed_payouts - Retries payouts that failed
 """
 
-import pytest
 from decimal import Decimal
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
+import pytest
 from django.db.models import F
 from django.utils import timezone
 from freezegun import freeze_time
 
 from apps.events.models import Event
 from apps.organizers.models import OrganizerPayout
-from apps.payments.models import Order, MPESATransaction
+from apps.payments.models import MPESATransaction, Order
 from apps.payments.tasks import (
     expire_stale_orders,
     handle_event_cancellation,
@@ -30,11 +30,11 @@ from apps.payments.tasks import (
 from apps.tests.factories import (
     EventFactory,
     MPESATransactionFactory,
+    OrderFactory,
     OrganizerPaymentConfigFactory,
     OrganizerPayoutFactory,
     OrganizerPayoutWithOrderFactory,
     OrganizerProfileFactory,
-    OrderFactory,
 )
 
 # Platform fee rate constant (2%)
@@ -120,6 +120,7 @@ class TestExpireStaleOrdersTask:
 
         # Expire order and release tickets
         from apps.payments.tasks import expire_stale_orders
+
         # Task should atomically release tickets
         order.status = 'expired'
         order.save()

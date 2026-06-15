@@ -22,7 +22,6 @@ Assertion helpers from tests/helpers/assertions:
 from unittest.mock import patch
 
 import pytest
-
 from tests.graphql.client import GraphQLClient
 from tests.graphql.mutations import (
     COMPLETE_ONBOARDING,

@@ -1,23 +1,20 @@
-import pytest
 from decimal import Decimal
+
+import pytest
 
 from apps.tests.factories.core_factory import CategoryFactory, InterestFactory
 from apps.tests.factories.event_factory import EventFactory, UserEventsFactory
 from apps.tests.factories.organizer_factory import (
-    OrganizerProfileFactory,
     OrganizerPaymentConfigFactory,
-    OrganizerPayoutFactory
+    OrganizerPayoutFactory,
+    OrganizerProfileFactory,
 )
-from apps.tests.factories.payment_factory import (
-    OrderFactory,
-    MPESATransactionFactory,
-    OrganizerPayoutWithOrderFactory
-)
-
+from apps.tests.factories.payment_factory import MPESATransactionFactory, OrderFactory, OrganizerPayoutWithOrderFactory
 
 # ============================================================================
 # CORE FIXTURES
 # ============================================================================
+
 
 @pytest.fixture
 def category(db):

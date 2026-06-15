@@ -15,7 +15,6 @@ import logging
 import os
 import re
 from datetime import datetime
-from decimal import Decimal
 
 import requests
 from django.conf import settings

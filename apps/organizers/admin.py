@@ -1,5 +1,6 @@
 from django.contrib import admin
-from .models import OrganizerProfile, OrganizerPaymentConfig, OrganizerPayout
+
+from .models import OrganizerPaymentConfig, OrganizerPayout, OrganizerProfile
 
 
 @admin.register(OrganizerProfile)

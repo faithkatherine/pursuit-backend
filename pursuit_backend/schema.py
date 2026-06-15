@@ -3,8 +3,8 @@ import graphene
 from apps.buckets.schema import BucketsMutations, BucketsQueries
 from apps.events.schema import EventsMutations, EventsQueries
 from apps.insights.schema import InsightsQueries
-from apps.recommendations.schema import RecommendationsQueries
 from apps.itinerary.schema import ItineraryMutations
+from apps.recommendations.schema import RecommendationsQueries
 from apps.users.schema import UserMutations, UserQueries
 
 

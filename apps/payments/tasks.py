@@ -13,10 +13,10 @@ from django.db.models import F
 from django.utils import timezone
 
 from apps.core.models import PlatformConfig
-from apps.events.models import Event, TicketTier
+from apps.events.models import TicketTier
 from apps.organizers.models import OrganizerPayout
 from apps.payments import daraja
-from apps.payments.models import MPESATransaction, Order
+from apps.payments.models import Order
 
 logger = logging.getLogger(__name__)
 
@@ -138,9 +138,9 @@ def process_single_payout(payout_id):
 
     # Call appropriate Daraja function
     if payout_type == 'b2c':
-        daraja_response = daraja.initiate_b2c_payout(payout)
+        daraja.initiate_b2c_payout(payout)
     elif payout_type in ['b2b_paybill', 'b2b_till']:
-        daraja_response = daraja.initiate_b2b_payout(payout)
+        daraja.initiate_b2b_payout(payout)
     else:
         raise ValueError(f"Invalid payout_type: {payout_type}")
 

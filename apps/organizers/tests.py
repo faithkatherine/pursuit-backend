@@ -1,27 +1,18 @@
-import pytest
 from decimal import Decimal
-from django.utils import timezone
+
+import pytest
 from django.db.models import ProtectedError
+from django.utils import timezone
 
-from apps.organizers.models import (
-    OrganizerProfile,
-    OrganizerPaymentConfig,
-    OrganizerPayout
-)
-from apps.tests.factories.organizer_factory import (
-    OrganizerProfileFactory,
-    OrganizerPaymentConfigFactory
-)
-from apps.tests.factories.payment_factory import (
-    OrderFactory,
-    OrganizerPayoutWithOrderFactory
-)
+from apps.organizers.models import OrganizerPaymentConfig, OrganizerPayout, OrganizerProfile
+from apps.tests.factories.organizer_factory import OrganizerPaymentConfigFactory, OrganizerProfileFactory
+from apps.tests.factories.payment_factory import OrderFactory, OrganizerPayoutWithOrderFactory
 from apps.tests.factories.user_factory import UserFactory
-
 
 # ============================================================================
 # ORGANIZER PROFILE TESTS
 # ============================================================================
+
 
 @pytest.mark.django_db
 class TestOrganizerProfile:

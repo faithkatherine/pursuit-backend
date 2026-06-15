@@ -1,6 +1,7 @@
 import graphene
 
 from apps.events.types import EventType
+
 from .services import get_recommended_events
 
 

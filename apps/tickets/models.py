@@ -2,7 +2,6 @@ import secrets
 import string
 
 from django.db import IntegrityError, models
-from django.utils import timezone
 
 
 def generate_ticket_token() -> str:
@@ -16,8 +15,7 @@ def generate_ticket_token() -> str:
     return ''.join(secrets.choice(alphabet) for _ in range(20))
 
 
-def create_ticket_with_retry(order_item, attendee_name, attendee_email,
-                              max_retries=5):
+def create_ticket_with_retry(order_item, attendee_name, attendee_email, max_retries=5):
     """
     Creates a Ticket with a unique token. Retries on the rare
     IntegrityError from token collision (unique constraint violation).

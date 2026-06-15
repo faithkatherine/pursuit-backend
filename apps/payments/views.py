@@ -16,7 +16,7 @@ from django.http import JsonResponse
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
-from drf_spectacular.utils import extend_schema, OpenApiResponse
+from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
@@ -704,11 +704,6 @@ class B2CCallbackView(APIView):
 
         try:
             callback_data = request.data
-            result = callback_data.get('Result', {})
-            result_code = result.get('ResultCode')
-
-            # Extract ConversationID or receipt to find payout
-            conversation_id = result.get('ConversationID')
 
             # For now, log the callback
             logger.info(f"B2C callback received: {callback_data}")
@@ -743,10 +738,6 @@ class B2BCallbackView(APIView):
 
         try:
             callback_data = request.data
-            result = callback_data.get('Result', {})
-            result_code = result.get('ResultCode')
-
-            conversation_id = result.get('ConversationID')
 
             logger.info(f"B2B callback received: {callback_data}")
 
@@ -854,8 +845,6 @@ class ReversalCallbackView(APIView):
 
         try:
             callback_data = request.data
-            result = callback_data.get('Result', {})
-            result_code = result.get('ResultCode')
 
             logger.info(f"Reversal callback received: {callback_data}")
 

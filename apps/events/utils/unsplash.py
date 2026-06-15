@@ -2,7 +2,6 @@ import os
 
 import requests
 
-
 UNSPLASH_RANDOM_PHOTO_URL = "https://api.unsplash.com/photos/random"
 
 CATEGORY_KEYWORDS = {

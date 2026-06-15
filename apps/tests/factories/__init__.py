@@ -5,21 +5,17 @@ Usage:
     from tests.factories import UserFactory, EventFactory, OrderFactory
 """
 
-from .user_factory import UserFactory
 from .core_factory import CategoryFactory, InterestFactory
 from .event_factory import EventFactory, UserEventsFactory
-from .organizer_factory import (
-    OrganizerProfileFactory,
-    OrganizerPaymentConfigFactory,
-    OrganizerPayoutFactory
-)
+from .organizer_factory import OrganizerPaymentConfigFactory, OrganizerPayoutFactory, OrganizerProfileFactory
 from .payment_factory import (
-    TicketTierFactory,
-    OrderItemFactory,
-    OrderFactory,
     MPESATransactionFactory,
-    OrganizerPayoutWithOrderFactory
+    OrderFactory,
+    OrderItemFactory,
+    OrganizerPayoutWithOrderFactory,
+    TicketTierFactory,
 )
+from .user_factory import UserFactory
 
 __all__ = [
     # User

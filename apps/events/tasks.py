@@ -36,7 +36,6 @@ def cleanup_stale_event_caches():
     try:
         # Pattern match all event cache keys
         pattern = "events:v*"
-        cursor = 0
         deleted_count = 0
 
         # Note: This requires Redis. If using different cache backend,

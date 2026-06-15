@@ -3,8 +3,8 @@ Management command to manually refresh the events cache.
 Run with: python manage.py refresh_cache
 """
 
-from django.core.management.base import BaseCommand
 from django.core.cache import cache
+from django.core.management.base import BaseCommand
 
 from apps.events.signals import EVENTS_CACHE_VERSION_KEY
 

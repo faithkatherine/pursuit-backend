@@ -1,5 +1,6 @@
 from django.contrib import admin
-from .models import Order, MPESATransaction
+
+from .models import MPESATransaction, Order
 
 
 @admin.register(Order)

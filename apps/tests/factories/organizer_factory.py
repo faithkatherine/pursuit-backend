@@ -1,13 +1,10 @@
-import factory
-from factory.django import DjangoModelFactory
 from decimal import Decimal
-from django.utils import timezone
 
-from apps.organizers.models import (
-    OrganizerProfile,
-    OrganizerPaymentConfig,
-    OrganizerPayout
-)
+import factory
+from django.utils import timezone
+from factory.django import DjangoModelFactory
+
+from apps.organizers.models import OrganizerPaymentConfig, OrganizerPayout, OrganizerProfile
 from apps.tests.factories.user_factory import UserFactory
 
 

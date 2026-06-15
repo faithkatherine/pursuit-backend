@@ -8,48 +8,48 @@ Tests complete end-to-end workflows:
 4. Concurrency scenarios (race conditions, ticket inventory)
 """
 
-import pytest
 import threading
-from decimal import Decimal
-from unittest.mock import patch, MagicMock
 from datetime import timedelta
+from decimal import Decimal
+from unittest.mock import MagicMock, patch
 
-from django.utils import timezone
+import pytest
 from django.core.cache import cache
 from django.db.models import F
+from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.payments.models import Order, MPESATransaction
 from apps.organizers.models import OrganizerPayout
+from apps.payments.conftest import (
+    MOCK_B2C_SUCCESS_RESPONSE,
+    MOCK_REVERSAL_SUCCESS_RESPONSE,
+    MOCK_STK_CALLBACK_FAILED,
+    MOCK_STK_CALLBACK_SUCCESS,
+    MOCK_STK_SUCCESS_RESPONSE,
+    PLATFORM_FEE_RATE,
+)
+from apps.payments.models import MPESATransaction, Order
 from apps.payments.tasks import (
+    expire_stale_orders,
+    handle_event_cancellation,
     process_scheduled_payouts,
     process_single_payout,
     refund_cancelled_event_orders,
-    handle_event_cancellation,
-    expire_stale_orders,
 )
 from apps.tests.factories import (
     EventFactory,
+    MPESATransactionFactory,
     OrderFactory,
     OrganizerPaymentConfigFactory,
     OrganizerProfileFactory,
     UserFactory,
-    MPESATransactionFactory,
 )
 from apps.tests.factories.organizer_factory import OrganizerPayoutFactory
-from apps.payments.conftest import (
-    PLATFORM_FEE_RATE,
-    MOCK_STK_SUCCESS_RESPONSE,
-    MOCK_STK_CALLBACK_SUCCESS,
-    MOCK_STK_CALLBACK_FAILED,
-    MOCK_B2C_SUCCESS_RESPONSE,
-    MOCK_REVERSAL_SUCCESS_RESPONSE,
-)
-
 
 # ============================================================================
 # TEST CLASS 1: FULL PAYMENT FLOW
 # ============================================================================
+
 
 @pytest.mark.django_db
 class TestFullPaymentFlow:

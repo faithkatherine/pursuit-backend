@@ -10,10 +10,10 @@ Tests the complete payment flow as described in pursuit_payment_architecture.md:
 These tests define the expected API contract and flow.
 """
 
-import pytest
 from decimal import Decimal
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
+import pytest
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APIClient
@@ -28,9 +28,9 @@ from apps.payments.tasks import (
 from apps.tests.factories import (
     EventFactory,
     MPESATransactionFactory,
+    OrderFactory,
     OrganizerPaymentConfigFactory,
     OrganizerProfileFactory,
-    OrderFactory,
     UserFactory,
 )
 from apps.tests.factories.organizer_factory import OrganizerPayoutFactory
@@ -747,24 +747,27 @@ class TestPhoneValidation:
 
     def test_non_safaricom_number_rejected(self):
         """Test 254200000000 rejected (not 2547X or 2541X)"""
-        from apps.payments.daraja import validate_phone
         from django.core.exceptions import ValidationError
+
+        from apps.payments.daraja import validate_phone
 
         with pytest.raises(ValidationError):
             validate_phone('254200000000')
 
     def test_too_short_rejected(self):
         """Test 07123 rejected as too short"""
-        from apps.payments.daraja import validate_phone
         from django.core.exceptions import ValidationError
+
+        from apps.payments.daraja import validate_phone
 
         with pytest.raises(ValidationError):
             validate_phone('07123')
 
     def test_too_long_rejected(self):
         """Test 2547123456789 rejected (13 digits)"""
-        from apps.payments.daraja import validate_phone
         from django.core.exceptions import ValidationError
+
+        from apps.payments.daraja import validate_phone
 
         with pytest.raises(ValidationError):
             validate_phone('2547123456789')
