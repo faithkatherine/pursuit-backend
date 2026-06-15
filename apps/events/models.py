@@ -12,6 +12,8 @@ class Event(models.Model):
         'organizers.OrganizerProfile',
         on_delete=models.PROTECT,
         related_name='events',
+        null=True,
+        blank=True,
         help_text='Event organizer (cannot delete organizer with events)'
     )
     category = models.ManyToManyField('core.Category',  blank=True, related_name='events')
