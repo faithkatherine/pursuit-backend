@@ -86,7 +86,7 @@ class Ticket(models.Model):
         ordering = ['created_at']
 
     def __str__(self):
-        event = self.order_item.tier.event.title
+        event = self.order_item.tier.event.name
         tier = self.order_item.tier.name
         return f"{event} — {tier} — {self.token}"
 

@@ -69,7 +69,7 @@ class TicketVerifyView(APIView):
             'token': ticket.token,
             'attendee_name': ticket.attendee_name or 'Guest',
             'tier_name': ticket.tier.name,
-            'event_title': event.title,
+            'event_title': event.name,
             'event_date': str(event.date) if hasattr(event, 'date') else '',
             'used_at': ticket.used_at,
             'reason': 'already_used' if ticket.is_used else None,
@@ -77,7 +77,7 @@ class TicketVerifyView(APIView):
 
         logger.info(
             f'Ticket verified: {ticket.token} '
-            f'event={event.title} '
+            f'event={event.name} '
             f'used={ticket.is_used}'
         )
 
@@ -156,7 +156,7 @@ class TicketUseView(APIView):
 
         logger.info(
             f'Ticket used: {ticket.token} '
-            f'event={ticket.event.title} '
+            f'event={ticket.event.name} '
             f'organizer={organizer.business_name}'
         )
 

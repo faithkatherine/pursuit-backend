@@ -1,5 +1,6 @@
 from django.contrib.gis.db import models
 from django.core.exceptions import ValidationError
+from django.utils.translation import gettext_lazy as _
 from apps.users.models import User
 
 
@@ -7,6 +8,12 @@ from apps.users.models import User
 class Event(models.Model):
     name = models.CharField(max_length=255, unique=True, null=False, blank=False)
     description = models.TextField(null=True, blank=True)
+    organizer = models.ForeignKey(
+        'organizers.OrganizerProfile',
+        on_delete=models.PROTECT,
+        related_name='events',
+        help_text='Event organizer (cannot delete organizer with events)'
+    )
     category = models.ManyToManyField('core.Category',  blank=True, related_name='events')
     date = models.DateTimeField(null=False, blank=False)
     end_date = models.DateTimeField(null=True, blank=True)
@@ -24,12 +31,12 @@ class Event(models.Model):
 
     @property
     def starting_price(self):
-        """Cheapest active tier price. Falls back to self.price."""
+        """Cheapest active tier price."""
         from django.db.models import Min
         result = self.ticket_tiers.filter(
             is_active=True
         ).aggregate(min_price=Min('price'))
-        return result['min_price'] or self.price
+        return result['min_price']
 
     @property
     def total_available(self):
@@ -38,12 +45,7 @@ class Event(models.Model):
         result = self.ticket_tiers.filter(
             is_active=True
         ).aggregate(total=Sum('available'))
-        return result['total'] if result['total'] is not None \
-            else self.available_tickets
-
-    def save(self, *args, **kwargs):
-        self.is_free = self.price == 0
-        super().save(*args, **kwargs)
+        return result['total'] or 0
 
     def clean(self):
         super().clean()
@@ -58,7 +60,6 @@ class Event(models.Model):
             models.Index(fields=["date"]),
             models.Index(fields=["location"]),
             models.Index(fields=["is_active", "date"]),
-            models.Index(fields=["is_free", "date"]),
         ]
 
 

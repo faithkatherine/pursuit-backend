@@ -41,7 +41,7 @@ class TicketSummarySerializer(serializers.ModelSerializer):
     """
     tier_name = serializers.CharField(source='tier.name', read_only=True)
     event_title = serializers.CharField(
-        source='order_item.tier.event.title',
+        source='order_item.tier.event.name',
         read_only=True
     )
 

@@ -37,7 +37,7 @@ class TicketAdmin(admin.ModelAdmin):
 
     @admin.display(description='Event')
     def event_title(self, obj: Ticket) -> str:
-        return obj.event.title
+        return obj.event.name
 
     @admin.display(description='Tier')
     def tier_name(self, obj: Ticket) -> str:
