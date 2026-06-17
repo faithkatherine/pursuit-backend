@@ -5,7 +5,7 @@ from django.utils import timezone
 
 from apps.core.storage import upload_image
 
-from .models import EditorsPick, Event, TicketTier, UserEvents
+from .models import EditorsPick, Event, EventGoing, TicketTier, UserEvents
 
 
 class IsPaidFilter(django_admin.SimpleListFilter):
@@ -150,6 +150,16 @@ class UserEventsAdmin(admin.ModelAdmin):
 
 
 admin.site.register(UserEvents, UserEventsAdmin)
+
+
+class EventGoingAdmin(admin.ModelAdmin):
+    list_display = ("user", "event", "created_at")
+    search_fields = ("user__username", "user__email", "user__first_name", "event__name")
+    list_filter = ("created_at",)
+    readonly_fields = ("created_at",)
+
+
+admin.site.register(EventGoing, EventGoingAdmin)
 
 
 @admin.register(EditorsPick)

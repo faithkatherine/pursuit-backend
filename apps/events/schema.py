@@ -9,8 +9,10 @@ from django.db.models import Exists, OuterRef, Q
 from django.utils import timezone
 from graphql import GraphQLError
 
+from apps.payments.models import Order
+
 from .locations import location_tag_from_coords
-from .models import EditorsPick, Event, UserEvents
+from .models import EditorsPick, Event, EventGoing, UserEvents
 from .signals import EVENTS_CACHE_VERSION_KEY
 from .types import EventType
 
@@ -25,6 +27,17 @@ def _annotate_is_saved(queryset, user):
     return queryset.annotate(
         _is_saved=Exists(
             UserEvents.objects.filter(user=user, event=OuterRef("pk"))
+        )
+    )
+
+
+def _annotate_is_going(queryset, user):
+    """Annotate each event with _is_going for the given user (single query, no N+1)."""
+    if not user.is_authenticated:
+        return queryset
+    return queryset.annotate(
+        _is_going=Exists(
+            EventGoing.objects.filter(user=user, event=OuterRef("pk"))
         )
     )
 
@@ -152,11 +165,72 @@ class UnsaveEventMutation(graphene.Mutation):
         return SaveEventPayload(ok=True, event=event, errors=[])
 
 
+class GoingEventPayload(graphene.ObjectType):
+    """Response payload for going/ungoing event mutations."""
+
+    ok = graphene.Boolean(required=True)
+    event = graphene.Field(EventType)
+    errors = graphene.List(graphene.NonNull(graphene.String))
+
+
+class MarkGoingMutation(graphene.Mutation):
+    """Mark user as going to an event (no ticket required)."""
+
+    class Arguments:
+        id = graphene.ID(required=True)
+
+    Output = GoingEventPayload
+
+    def mutate(self, info, id):
+        if not info.context.user.is_authenticated:
+            return GoingEventPayload(
+                ok=False, event=None, errors=["Authentication required."]
+            )
+
+        try:
+            event = Event.objects.get(pk=id, is_active=True)
+            EventGoing.objects.get_or_create(user=info.context.user, event=event)
+            event._is_going = True
+            return GoingEventPayload(ok=True, event=event, errors=[])
+
+        except Event.DoesNotExist:
+            return GoingEventPayload(ok=False, event=None, errors=["Event not found."])
+
+
+class UnmarkGoingMutation(graphene.Mutation):
+    """Remove going status from an event."""
+
+    class Arguments:
+        id = graphene.ID(required=True)
+
+    Output = GoingEventPayload
+
+    def mutate(self, info, id):
+        if not info.context.user.is_authenticated:
+            return GoingEventPayload(
+                ok=False, event=None, errors=["Authentication required."]
+            )
+
+        try:
+            event = Event.objects.get(pk=id, is_active=True)
+        except Event.DoesNotExist:
+            return GoingEventPayload(ok=False, event=None, errors=["Event not found."])
+
+        deleted_count, _ = EventGoing.objects.filter(user=info.context.user, event=event).delete()
+        if deleted_count == 0:
+            return GoingEventPayload(ok=False, event=None, errors=["You are not marked as going to this event."])
+
+        event._is_going = False
+        return GoingEventPayload(ok=True, event=event, errors=[])
+
+
 class EventsMutations(graphene.ObjectType):
-    """Mutations for saving and unsaving events."""
+    """Mutations for saving and unsaving events, and marking going status."""
 
     save_event = SaveEventMutation.Field()
     unsave_event = UnsaveEventMutation.Field()
+    mark_going = MarkGoingMutation.Field()
+    unmark_going = UnmarkGoingMutation.Field()
 
 
 class EventsQueries(graphene.ObjectType):
@@ -180,6 +254,16 @@ class EventsQueries(graphene.ObjectType):
         id=graphene.ID(required=True),
     )
     saved_events = graphene.Field(
+        EventsListPayload,
+        offset=graphene.Int(),
+        limit=graphene.Int(),
+    )
+    upcoming_plans = graphene.Field(
+        EventsListPayload,
+        offset=graphene.Int(),
+        limit=graphene.Int(),
+    )
+    past_plans = graphene.Field(
         EventsListPayload,
         offset=graphene.Int(),
         limit=graphene.Int(),
@@ -254,15 +338,22 @@ class EventsQueries(graphene.ObjectType):
             id_order = {pk: i for i, pk in enumerate(event_ids)}
             events.sort(key=lambda e: id_order[e.pk])
 
-        # Annotate is_saved in a single query instead of N+1
+        # Annotate is_saved and is_going in single queries instead of N+1
         if user.is_authenticated and events:
+            event_ids = [e.pk for e in events]
             saved_ids = set(
                 UserEvents.objects.filter(
-                    user=user, event_id__in=[e.pk for e in events]
+                    user=user, event_id__in=event_ids
+                ).values_list("event_id", flat=True)
+            )
+            going_ids = set(
+                EventGoing.objects.filter(
+                    user=user, event_id__in=event_ids
                 ).values_list("event_id", flat=True)
             )
             for event in events:
                 event._is_saved = event.pk in saved_ids
+                event._is_going = event.pk in going_ids
 
         return EventsListPayload(ok=True, events=events)
 
@@ -288,6 +379,104 @@ class EventsQueries(graphene.ObjectType):
         )
         return EventsListPayload(ok=True, events=list(qs[offset : offset + limit]))
 
+    def resolve_upcoming_plans(self, info, offset=0, limit=20):
+        """Return upcoming ticketed and going events for the authenticated user."""
+        user = info.context.user
+        if not user.is_authenticated:
+            raise GraphQLError("Authentication required.")
+
+        offset = max(0, offset)
+        limit = max(1, min(limit, MAX_LIMIT))
+        now = timezone.now()
+
+        # Get event IDs from paid orders (ticketed events)
+        ticketed_event_ids = Order.objects.filter(
+            user=user,
+            status='paid',
+            event__date__gte=now,
+            event__is_active=True,
+        ).values_list('event_id', flat=True)
+
+        # Get event IDs from going events
+        going_event_ids = EventGoing.objects.filter(
+            user=user,
+            event__date__gte=now,
+            event__is_active=True,
+        ).values_list('event_id', flat=True)
+
+        # Combine and get unique event IDs
+        all_event_ids = set(ticketed_event_ids) | set(going_event_ids)
+
+        # Fetch events and annotate
+        qs = (
+            _annotate_is_saved(
+                _annotate_is_going(
+                    Event.objects.filter(pk__in=all_event_ids),
+                    user
+                ),
+                user
+            )
+            .prefetch_related("category")
+            .order_by("date")
+        )
+
+        # Mark which events have confirmed tickets
+        ticketed_ids = set(ticketed_event_ids)
+        events = list(qs[offset : offset + limit])
+        for event in events:
+            event._has_confirmed_ticket = event.pk in ticketed_ids
+
+        return EventsListPayload(ok=True, events=events)
+
+    def resolve_past_plans(self, info, offset=0, limit=20):
+        """Return past ticketed and going events for the authenticated user."""
+        user = info.context.user
+        if not user.is_authenticated:
+            raise GraphQLError("Authentication required.")
+
+        offset = max(0, offset)
+        limit = max(1, min(limit, MAX_LIMIT))
+        now = timezone.now()
+
+        # Get event IDs from paid orders (ticketed events)
+        ticketed_event_ids = Order.objects.filter(
+            user=user,
+            status='paid',
+            event__date__lt=now,
+            event__is_active=True,
+        ).values_list('event_id', flat=True)
+
+        # Get event IDs from going events
+        going_event_ids = EventGoing.objects.filter(
+            user=user,
+            event__date__lt=now,
+            event__is_active=True,
+        ).values_list('event_id', flat=True)
+
+        # Combine and get unique event IDs
+        all_event_ids = set(ticketed_event_ids) | set(going_event_ids)
+
+        # Fetch events and annotate
+        qs = (
+            _annotate_is_saved(
+                _annotate_is_going(
+                    Event.objects.filter(pk__in=all_event_ids),
+                    user
+                ),
+                user
+            )
+            .prefetch_related("category")
+            .order_by("-date")  # Most recent first for past events
+        )
+
+        # Mark which events have confirmed tickets
+        ticketed_ids = set(ticketed_event_ids)
+        events = list(qs[offset : offset + limit])
+        for event in events:
+            event._has_confirmed_ticket = event.pk in ticketed_ids
+
+        return EventsListPayload(ok=True, events=events)
+
     def resolve_event(self, info, id):
         """Return a single active event by ID. Raises GraphQLError if not found or inactive."""
         try:
@@ -300,6 +489,9 @@ class EventsQueries(graphene.ObjectType):
 
         if info.context.user.is_authenticated:
             event._is_saved = UserEvents.objects.filter(
+                user=info.context.user, event=event
+            ).exists()
+            event._is_going = EventGoing.objects.filter(
                 user=info.context.user, event=event
             ).exists()
 

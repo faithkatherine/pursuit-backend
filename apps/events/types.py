@@ -26,6 +26,7 @@ class EventType(DjangoObjectType):
 
     coordinates = graphene.List(graphene.Float)
     is_saved = graphene.Boolean()
+    is_going = graphene.Boolean()
     is_editors_pick = graphene.Boolean()
     has_confirmed_ticket = graphene.Boolean()
     reason = graphene.String()
@@ -70,6 +71,17 @@ class EventType(DjangoObjectType):
         if not user.is_authenticated:
             return False
         return self.user_interactions.filter(user=user).exists()
+
+    def resolve_is_going(self, info):
+        # Use annotation from queryset if available (no extra query)
+        if hasattr(self, "_is_going"):
+            return self._is_going
+        # Fallback for single-event lookups
+        user = info.context.user
+        if not user.is_authenticated:
+            return False
+        from .models import EventGoing
+        return EventGoing.objects.filter(user=user, event=self).exists()
 
     def resolve_reason(self, info):
         return getattr(self, "_reason", None)

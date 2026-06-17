@@ -225,6 +225,88 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaymentStatusResponse'
           description: ''
+  /api/tickets/order/{order_id}/:
+    get:
+      operationId: tickets_order_list
+      description: |-
+        List all tickets for an order.
+        Called by the confirmation screen to get tokens for QR codes.
+        User can only see their own tickets.
+      summary: List tickets for an order
+      parameters:
+      - in: path
+        name: order_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - tickets
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TicketSummary'
+          description: ''
+  /api/tickets/use/{token}/:
+    post:
+      operationId: tickets_use_create
+      description: Marks a verified ticket as used. Only the organizer of the event
+        can call this. Idempotent — safe to call twice, returns original used_at if
+        already marked.
+      summary: Mark a ticket as used
+      parameters:
+      - in: path
+        name: token
+        schema:
+          type: string
+        required: true
+      tags:
+      - tickets
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketUseResponse'
+          description: ''
+        '404':
+          description: Token not found
+        '403':
+          description: Organizer does not own this event
+  /api/tickets/verify/{token}/:
+    get:
+      operationId: tickets_verify_retrieve
+      description: Verifies a QR code token scanned at the event door. Returns attendee
+        name, tier, and whether the ticket has already been used. Does not mark as
+        used — call POST /api/tickets/use/{token}/ for that.
+      summary: Verify a ticket token
+      parameters:
+      - in: path
+        name: token
+        schema:
+          type: string
+        required: true
+      tags:
+      - tickets
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketVerificationResponse'
+          description: ''
+        '404':
+          description: Token not found
 components:
   schemas:
     InitiatePaymentRequest:
@@ -245,6 +327,14 @@ components:
           items:
             $ref: '#/components/schemas/TierSelectionRequest'
           description: List of tier selections
+        name:
+          type: string
+          default: ''
+          maxLength: 255
+        email:
+          type: string
+          format: email
+          default: ''
       required:
       - event_id
       - phone_number
@@ -332,6 +422,9 @@ components:
           items:
             $ref: '#/components/schemas/OrderItem'
           readOnly: true
+        tickets:
+          type: string
+          readOnly: true
         checkout_request_id:
           type: string
           readOnly: true
@@ -346,6 +439,7 @@ components:
       - resuming
       - status
       - subtotal
+      - tickets
       - total
     OrderResponseStatusEnum:
       enum:
@@ -391,6 +485,85 @@ components:
         * `failed` - failed
         * `expired` - expired
         * `refunded` - refunded
+    TicketSummary:
+      type: object
+      description: |-
+        Embedded in OrderResponseSerializer so the confirmation
+        screen can get the token for the QR code.
+      properties:
+        token:
+          type: string
+          readOnly: true
+        tier_name:
+          type: string
+          readOnly: true
+        event_title:
+          type: string
+          readOnly: true
+        is_used:
+          type: boolean
+          readOnly: true
+      required:
+      - event_title
+      - is_used
+      - tier_name
+      - token
+    TicketUseResponse:
+      type: object
+      description: Response from POST /api/tickets/use/{token}/
+      properties:
+        success:
+          type: boolean
+        used_at:
+          type: string
+          format: date-time
+        attendee_name:
+          type: string
+        tier_name:
+          type: string
+      required:
+      - attendee_name
+      - success
+      - tier_name
+      - used_at
+    TicketVerificationResponse:
+      type: object
+      description: |-
+        Response from GET /api/tickets/verify/{token}/
+        Used by the organizer dashboard scanner.
+      properties:
+        valid:
+          type: boolean
+        already_used:
+          type: boolean
+          default: false
+        token:
+          type: string
+        attendee_name:
+          type: string
+        tier_name:
+          type: string
+        event_title:
+          type: string
+        event_date:
+          type: string
+        used_at:
+          type: string
+          format: date-time
+          nullable: true
+        reason:
+          type: string
+          nullable: true
+          description: 'Only set when valid=False. Values: invalid_token | already_used
+            | wrong_event'
+      required:
+      - attendee_name
+      - event_date
+      - event_title
+      - tier_name
+      - token
+      - used_at
+      - valid
     TierSelectionRequest:
       type: object
       description: Individual tier selection within an order

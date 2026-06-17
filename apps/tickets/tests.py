@@ -1,4 +1,5 @@
 import string
+from datetime import timedelta
 from unittest.mock import patch
 
 import pytest
@@ -32,8 +33,9 @@ class TestTicketCreation:
             business_name='Test Organizer'
         )
         event = Event.objects.create(
-            title='Test Event',
-            organizer=organizer
+            name='Test Event',
+            organizer=organizer,
+            date=timezone.now() + timedelta(days=7)
         )
         tier = TicketTier.objects.create(
             event=event,
@@ -82,8 +84,9 @@ class TestTicketCreation:
             business_name='Test Organizer'
         )
         event = Event.objects.create(
-            title='Test Event',
-            organizer=organizer
+            name='Test Event',
+            organizer=organizer,
+            date=timezone.now() + timedelta(days=7)
         )
         tier = TicketTier.objects.create(
             event=event,
@@ -135,8 +138,9 @@ class TestTicketCreation:
             business_name='Test Organizer'
         )
         event = Event.objects.create(
-            title='Test Event',
-            organizer=organizer
+            name='Test Event',
+            organizer=organizer,
+            date=timezone.now() + timedelta(days=7)
         )
         tier = TicketTier.objects.create(
             event=event,
@@ -185,8 +189,9 @@ class TestTicketCreation:
             business_name='Test Organizer'
         )
         event = Event.objects.create(
-            title='Test Event',
-            organizer=organizer
+            name='Test Event',
+            organizer=organizer,
+            date=timezone.now() + timedelta(days=7)
         )
         tier = TicketTier.objects.create(
             event=event,
@@ -242,8 +247,9 @@ class TestTicketVerification:
             business_name='Test Organizer'
         )
         event = Event.objects.create(
-            title='Test Event',
-            organizer=organizer
+            name='Test Event',
+            organizer=organizer,
+            date=timezone.now() + timedelta(days=7)
         )
         tier = TicketTier.objects.create(
             event=event,
@@ -298,8 +304,9 @@ class TestTicketVerification:
             business_name='Test Organizer'
         )
         event = Event.objects.create(
-            title='Test Event',
-            organizer=organizer
+            name='Test Event',
+            organizer=organizer,
+            date=timezone.now() + timedelta(days=7)
         )
         tier = TicketTier.objects.create(
             event=event,
@@ -388,8 +395,9 @@ class TestTicketUse:
         client.force_authenticate(user=user)
 
         event = Event.objects.create(
-            title='Test Event',
-            organizer=organizer
+            name='Test Event',
+            organizer=organizer,
+            date=timezone.now() + timedelta(days=7)
         )
         tier = TicketTier.objects.create(
             event=event,
@@ -451,8 +459,9 @@ class TestTicketUse:
         client.force_authenticate(user=user)
 
         event = Event.objects.create(
-            title='Test Event',
-            organizer=organizer
+            name='Test Event',
+            organizer=organizer,
+            date=timezone.now() + timedelta(days=7)
         )
         tier = TicketTier.objects.create(
             event=event,

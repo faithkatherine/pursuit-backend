@@ -208,3 +208,25 @@ class UserEvents(models.Model):
 
     def __str__(self):
         return f"{self.user.email} saved {self.event.name}"
+
+
+class EventGoing(models.Model):
+    """User marked as going to an event (no ticket required)"""
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="going_events")
+    event = models.ForeignKey("events.Event", on_delete=models.CASCADE, related_name="going_users")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "events_event_going"
+        verbose_name = _("Event Going")
+        verbose_name_plural = _("Events Going")
+        indexes = [
+            models.Index(fields=["user", "event"]),
+            models.Index(fields=["user", "-created_at"]),
+            models.Index(fields=["event"]),
+        ]
+        unique_together = ("user", "event")
+
+    def __str__(self):
+        return f"{self.user.email} going to {self.event.name}"
