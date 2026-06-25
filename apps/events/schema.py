@@ -310,7 +310,8 @@ class EventsQueries(graphene.ObjectType):
         event_ids = cache.get(cache_key)
 
         if event_ids is None:
-            qs = Event.objects.filter(is_active=True)
+            # Hard filter: exclude past events before any user-applied filters
+            qs = Event.objects.filter(is_active=True).exclude(status='ended')
 
             if search:
                 qs = qs.filter(

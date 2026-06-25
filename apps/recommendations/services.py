@@ -13,7 +13,7 @@ from django.core.cache import cache
 from django.db.models import Count
 from django.utils import timezone
 
-from apps.events.models import Event, UserEvents
+from apps.events.models import Event, EventGoing, UserEvents
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +25,10 @@ RECENCY_WEIGHT = 0.1
 
 CACHE_TTL = 600  # 10 minutes
 MIN_RESULTS = 3  # backfill with popular events if fewer than this
+
+# Trending constants
+TRENDING_WINDOW_HOURS = 72
+TRENDING_MIN_INTERACTIONS = 2
 
 
 def get_recommended_events(
@@ -46,13 +50,16 @@ def get_recommended_events(
 
     now = timezone.now()
 
-    # IDs of events the user already saved
+    # Hard exclusions: events the user already interacted with
     saved_event_ids = set(UserEvents.objects.filter(user=user).values_list("event_id", flat=True))
+    going_event_ids = set(EventGoing.objects.filter(user=user).values_list("event_id", flat=True))
+    user_interaction_ids = saved_event_ids | going_event_ids
 
-    # Build candidate queryset: active, future, not already saved, not excluded
+    # Build candidate queryset: active, future, not past, not already saved/going, not excluded
     candidates = (
         Event.objects.filter(is_active=True, date__gte=date_from or now)
-        .exclude(id__in=saved_event_ids)
+        .exclude(status='ended')
+        .exclude(id__in=user_interaction_ids)
         .annotate(save_count=Count("user_interactions"))
         .prefetch_related("category")
     )
@@ -206,10 +213,13 @@ def _determine_reason(event, event_category_ids, content_score, collab_score, po
 def get_trending_events(user, limit=5, date_from=None, date_to=None, exclude_event_ids=None):
     """
     Returns a list of (Event, reason_str, source_str) tuples
-    for the most popular events — purely by save_count, no personalization.
+    for events with the most momentum — based on recent interactions (last 72 hours).
+
+    Trending is a pure social signal, not personalized. Shows events gaining traction
+    right now based on saves and going RSVPs from all users.
 
     Args:
-        exclude_event_ids: List/set of event IDs to exclude (e.g., EditorsPick already shown)
+        exclude_event_ids: List/set of event IDs to exclude (e.g., EditorsPick, recommendations)
     """
     exclude_event_ids = exclude_event_ids or []
     exclude_key = ",".join(str(eid) for eid in sorted(exclude_event_ids)) if exclude_event_ids else "none"
@@ -218,25 +228,63 @@ def get_trending_events(user, limit=5, date_from=None, date_to=None, exclude_eve
     if cached is not None:
         return cached
 
-    from apps.events.models import Event, UserEvents
+    from datetime import timedelta
+    from django.db.models import Q
 
     now = timezone.now()
+    trending_cutoff = now - timedelta(hours=TRENDING_WINDOW_HOURS)
 
-    saved_event_ids = set(UserEvents.objects.filter(user=user).values_list("event_id", flat=True))
+    # Count recent interactions (saves + going) from ALL users in the last 72 hours
+    # We use a subquery to count distinct users who interacted with each event
+    from django.db.models import Count, OuterRef, Subquery
 
+    # Subquery: count unique users who saved OR went to each event in last 72 hours
+    recent_saves = UserEvents.objects.filter(
+        event_id=OuterRef('pk'),
+        created_at__gte=trending_cutoff
+    ).values('event_id').annotate(
+        save_count=Count('user_id', distinct=True)
+    ).values('save_count')
+
+    recent_going = EventGoing.objects.filter(
+        event_id=OuterRef('pk'),
+        created_at__gte=trending_cutoff
+    ).values('event_id').annotate(
+        going_count=Count('user_id', distinct=True)
+    ).values('going_count')
+
+    # Build queryset: upcoming events with recent momentum
     qs = (
         Event.objects.filter(is_active=True, date__gte=date_from or now)
-        .exclude(id__in=saved_event_ids)
-        .annotate(save_count=Count("user_interactions"))
-        .filter(save_count__gt=0)
+        .exclude(status='ended')
+        .annotate(
+            recent_save_count=Subquery(recent_saves),
+            recent_going_count=Subquery(recent_going)
+        )
     )
+
     if exclude_event_ids:
         qs = qs.exclude(id__in=exclude_event_ids)
     if date_to:
         qs = qs.filter(date__lte=date_to)
 
-    trending = qs.order_by("-save_count", "date").prefetch_related("category")[:limit]
+    # Fetch and score in Python (sum save + going, filter by threshold)
+    events_with_scores = []
+    for event in qs.prefetch_related("category"):
+        save_count = event.recent_save_count or 0
+        going_count = event.recent_going_count or 0
+        total_interactions = save_count + going_count
 
-    results = [(event, "Trending", "trending") for event in trending]
+        # Apply minimum threshold
+        if total_interactions >= TRENDING_MIN_INTERACTIONS:
+            events_with_scores.append((event, total_interactions))
+
+    # Sort by interaction count descending, then by date ascending (sooner first)
+    events_with_scores.sort(key=lambda x: (-x[1], x[0].date))
+
+    # Take top N and format as results
+    trending_events = [event for event, _score in events_with_scores[:limit]]
+    results = [(event, "Trending", "trending") for event in trending_events]
+
     cache.set(cache_key, results, CACHE_TTL)
     return results

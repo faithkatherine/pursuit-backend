@@ -295,35 +295,40 @@ class InsightsQueries(graphene.ObjectType):
             editors_pick_event._curator_name = editors_pick.curator_name
             editors_pick_event._is_editors_pick = True
 
-        # Prepare exclusion list for recommendations and trending
-        exclude_event_ids = [editors_pick_event_id] if editors_pick_event_id else []
+        # Build progressive exclusion set to prevent duplicates across sections
+        exclude_event_ids = set()
 
-        # Get personalized event recommendations (excluding EditorsPick)
+        # Step 1: Add Editor's Pick to exclusion set
+        if editors_pick_event_id:
+            exclude_event_ids.add(editors_pick_event_id)
+
+        # Step 2: Get personalized event recommendations (excluding EditorsPick)
         rec_results = get_recommended_events(
             user,
             offset=offset,
             limit=limit,
             date_from=date_from,
             date_to=date_to,
-            exclude_event_ids=exclude_event_ids,
+            exclude_event_ids=list(exclude_event_ids),
         )
         recommendations = []
 
-        # Add algorithm recommendations (already excludes the pick event)
+        # Add algorithm recommendations and update exclusion set
         for event, reason, source in rec_results:
             event._reason = reason
             event._source = source
             event._is_saved = False
             event._is_editors_pick = False
             recommendations.append(event)
+            exclude_event_ids.add(event.id)
 
-        # Get trending events (popularity-based, excluding EditorsPick)
+        # Step 3: Get trending events (excluding EditorsPick AND recommendations)
         trending_results = get_trending_events(
             user,
             limit=limit,
             date_from=date_from,
             date_to=date_to,
-            exclude_event_ids=exclude_event_ids,
+            exclude_event_ids=list(exclude_event_ids),
         )
         trending = []
         for event, reason, source in trending_results:
