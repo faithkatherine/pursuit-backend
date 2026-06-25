@@ -495,6 +495,33 @@ class EventsQueries(graphene.ObjectType):
                 user=info.context.user, event=event
             ).exists()
 
+            # Check if user has purchased a ticket for this event
+            user_order = Order.objects.filter(
+                user=info.context.user,
+                event=event,
+                status='paid'
+            ).select_related('mpesa_transaction').prefetch_related('items__tickets', 'items__tier').first()
+
+            if user_order:
+                # Import UserTicketType from types module
+                from .types import UserTicketType
+
+                # Count total tickets across all order items
+                ticket_count = sum(item.tickets.count() for item in user_order.items.all())
+
+                # Get primary tier name (from first order item)
+                tier_name = None
+                if user_order.items.exists():
+                    tier_name = user_order.items.first().tier.name
+
+                event._user_ticket_info = UserTicketType(
+                    order_id=str(user_order.id),
+                    ticket_count=ticket_count,
+                    total_paid=str(user_order.total),
+                    tier_name=tier_name,
+                    purchase_date=user_order.paid_at or user_order.created_at
+                )
+
         _attach_active_editors_pick(event, info.context.user)
 
         return EventPayload(ok=True, event=event)

@@ -1,11 +1,11 @@
-# Event Queries
+# Event Queries and Mutations
 
 type Query {
   """
   Get a paginated list of active events with optional search and filters.
   All filters combine with AND logic.
   """
-  Events(
+  events(
     search: String
     category: [ID]
     dateFrom: DateTime
@@ -21,12 +21,51 @@ type Query {
   """
   Get a single active event by ID. Returns error for non-existent or inactive events.
   """
-  Event(id: ID!): EventPayload!
+  event(id: ID!): EventPayload!
+
+  """
+  Get the authenticated user's saved events, ordered by most recently saved.
+  """
+  savedEvents(
+    offset: Int
+    limit: Int
+  ): EventsListPayload!
+
+  """
+  Get upcoming ticketed and going events for the authenticated user.
+  """
+  upcomingPlans(
+    offset: Int
+    limit: Int
+  ): EventsListPayload!
+
+  """
+  Get past ticketed and going events for the authenticated user.
+  """
+  pastPlans(
+    offset: Int
+    limit: Int
+  ): EventsListPayload!
 }
 
 type Mutation {
   """
-  Create a new user event
+  Save an event to the user's profile for later reference.
   """
-  saveEvent(id: ID!): UserEventPayload!
+  saveEvent(id: ID!): SaveEventPayload!
+
+  """
+  Remove an event from the user's saved list.
+  """
+  unsaveEvent(id: ID!): SaveEventPayload!
+
+  """
+  Mark user as going to an event (no ticket required).
+  """
+  markGoing(id: ID!): GoingEventPayload!
+
+  """
+  Remove going status from an event.
+  """
+  unmarkGoing(id: ID!): GoingEventPayload!
 }

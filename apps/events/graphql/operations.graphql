@@ -2,202 +2,250 @@
 Copy-paste ready client operations for Events
 """
 
+# ─── FRAGMENTS ────────────────────────────────────────────
+
+"""
+Core event fields for list views
+"""
+fragment EventCard on Event {
+  id
+  name
+  image
+  date
+  endDate
+  locationName
+  coordinates
+  isFree
+  isExternal
+  isInternal
+  price
+  goingCount
+  isSaved
+  isGoing
+  category {
+    id
+    name
+    icon
+    color
+  }
+}
+
+"""
+Full event details including user-specific fields
+"""
+fragment EventDetail on Event {
+  id
+  name
+  description
+  image
+  date
+  endDate
+  timezone
+  locationName
+  coordinates
+  moreDetailsUrl
+  price
+  ticketingEnabled
+  availableTickets
+  goingCount
+  hasGallery
+  galleryImages
+  galleryDescription
+  seriesName
+  isFree
+  isExternal
+  isInternal
+  isActive
+  isSaved
+  isGoing
+  hasConfirmedTicket
+  isEditorsPick
+  curatorNote
+  curatorName
+  reason
+  source
+  createdAt
+  updatedAt
+  category {
+    id
+    name
+    icon
+    description
+    color
+  }
+  ticketTiers {
+    id
+    name
+    description
+    price
+    available
+    capacity
+    isActive
+    sortOrder
+  }
+  userTicket {
+    orderId
+    ticketCount
+    totalPaid
+    tierName
+    purchaseDate
+  }
+}
+
 # ─── QUERIES ──────────────────────────────────────────────
 
 """
-Get all events (with default pagination: offset=0, limit=20)
+Get all events with filters (default pagination: offset=0, limit=20)
 """
-query GetEvents {
-  getEvents {
+query GetEvents(
+  $search: String
+  $category: [ID]
+  $dateFrom: DateTime
+  $dateTo: DateTime
+  $latitude: Float
+  $longitude: Float
+  $radiusKm: Float
+  $isFree: Boolean
+  $offset: Int
+  $limit: Int
+) {
+  events(
+    search: $search
+    category: $category
+    dateFrom: $dateFrom
+    dateTo: $dateTo
+    latitude: $latitude
+    longitude: $longitude
+    radiusKm: $radiusKm
+    isFree: $isFree
+    offset: $offset
+    limit: $limit
+  ) {
     ok
     events {
-      id
-      name
-      description
-      category {
-        id
-        name
-        icon
-      }
-      date
-      endDate
-      image
-      timezone
-      locationName
-      coordinates
-      moreDetailsUrl
-      isActive
+      ...EventCard
     }
   }
 }
 
 """
-Get events with pagination and filters
+Get events for map view (with location data)
 """
-query EventsWithFilters(
-  $search: String,
-  $category: [ID],
-  $dateFrom: DateTime,
-  $dateTo: DateTime,
-  $latitude: Float,
-  $longitude: Float,
-  $radiusKm: Float,
-  $isFree: Boolean,
-  $offset: Int,
+query GetEventsForMap(
+  $latitude: Float
+  $longitude: Float
+  $radiusKm: Float
+  $category: [ID]
+  $isFree: Boolean
+  $offset: Int
   $limit: Int
 ) {
-  Events(
-    search: $search,
-    category: $category,
-    dateFrom: $dateFrom,
-    dateTo: $dateTo,
-    latitude: $latitude,
-    longitude: $longitude,
-    radiusKm: $radiusKm,
-    isFree: $isFree,
-    offset: $offset,
+  events(
+    latitude: $latitude
+    longitude: $longitude
+    radiusKm: $radiusKm
+    category: $category
+    isFree: $isFree
+    offset: $offset
     limit: $limit
   ) {
     ok
     events {
       id
       name
-      description
-      category {
-        id
-        name
-        icon
-      }
       date
-      endDate
-      image
-      timezone
       locationName
       coordinates
-      moreDetailsUrl
-      isActive
-      isFree
-      isSaved
-    }
-  }
-}
-
-"""
-Get events - minimal fields (for list/card views)
-"""
-query EventsMinimal($search: String, $category: [ID], $isFree: Boolean, $offset: Int, $limit: Int) {
-  Events(search: $search, category: $category, isFree: $isFree, offset: $offset, limit: $limit) {
-    ok
-    events {
-      id
-      name
       image
-      date
-      locationName
       isFree
+      isExternal
+      price
       category {
         name
         icon
+        color
       }
     }
   }
 }
 
 """
-Get events - with location data (for map views)
+Get a single event by ID with full details
 """
-query EventsForMap($latitude: Float, $longitude: Float, $radiusKm: Float, $category: [ID], $offset: Int, $limit: Int) {
-  Events(latitude: $latitude, longitude: $longitude, radiusKm: $radiusKm, category: $category, offset: $offset, limit: $limit) {
-    ok
-    events {
-      id
-      name
-      date
-      locationName
-      coordinates
-      image
-      isFree
-    }
-  }
-}
-
-# ─── SINGLE EVENT QUERIES ────────────────────────────────
-
-"""
-Get a single event by ID (all fields)
-"""
-query Event($id: ID!) {
-  Event(id: $id) {
+query GetEvent($id: ID!) {
+  event(id: $id) {
     ok
     event {
-      id
-      name
-      description
-      category {
-        id
-        name
-        icon
-      }
-      date
-      endDate
-      image
-      timezone
-      locationName
-      coordinates
-      moreDetailsUrl
-      isActive
-      isFree
-      isSaved
+      ...EventDetail
     }
   }
 }
 
 """
-Get a single event - minimal fields (for previews/cards)
+Get user's saved events
 """
-query EventMinimal($id: ID!) {
-  Event(id: $id) {
+query GetSavedEvents($offset: Int, $limit: Int) {
+  savedEvents(offset: $offset, limit: $limit) {
     ok
-    event {
-      id
-      name
-      image
-      date
-      locationName
-      isFree
-      category {
-        name
-        icon
+    events {
+      ...EventCard
+    }
+  }
+}
+
+"""
+Get upcoming plans (ticketed + going events)
+"""
+query GetUpcomingPlans($offset: Int, $limit: Int) {
+  upcomingPlans(offset: $offset, limit: $limit) {
+    ok
+    events {
+      ...EventCard
+      hasConfirmedTicket
+      userTicket {
+        orderId
+        ticketCount
+        totalPaid
+        tierName
+        purchaseDate
       }
+    }
+  }
+}
+
+"""
+Get past plans (past ticketed + going events)
+"""
+query GetPastPlans($offset: Int, $limit: Int) {
+  pastPlans(offset: $offset, limit: $limit) {
+    ok
+    events {
+      ...EventCard
+      hasConfirmedTicket
     }
   }
 }
 
 # ─── MUTATIONS ────────────────────────────────────────────
 
-"""Mutation to save an event for the user"""
+"""
+Save an event for later
+"""
 mutation SaveEvent($id: ID!) {
   saveEvent(id: $id) {
     ok
     event {
       id
       name
-      description
-      date
-      locationName
-      coordinates
-      isActive
       isSaved
-      category {
-        id
-        name
-      }
     }
     errors
   }
 }
 
-"""Mutation to unsave an event for the user"""
+"""
+Remove event from saved list
+"""
 mutation UnsaveEvent($id: ID!) {
   unsaveEvent(id: $id) {
     ok
@@ -210,31 +258,89 @@ mutation UnsaveEvent($id: ID!) {
   }
 }
 
-# ─── SAVED EVENTS QUERIES ────────────────────────────────
-
-"""Get user's saved events"""
-query SavedEvents {
-  savedEvents {
+"""
+Mark as going to an event (RSVP)
+"""
+mutation MarkGoing($id: ID!) {
+  markGoing(id: $id) {
     ok
-    events {
+    event {
       id
       name
-      description
-      category {
-        id
-        name
-        icon
-      }
-      date
-      endDate
-      image
-      timezone
-      locationName
-      coordinates
-      moreDetailsUrl
-      isActive
-      isFree
-      isSaved
+      isGoing
+      goingCount
     }
+    errors
   }
 }
+
+"""
+Remove going status from event
+"""
+mutation UnmarkGoing($id: ID!) {
+  unmarkGoing(id: $id) {
+    ok
+    event {
+      id
+      name
+      isGoing
+      goingCount
+    }
+    errors
+  }
+}
+
+# ─── EXAMPLE USAGE ────────────────────────────────────────
+
+# Example 1: Search for free outdoor events
+# query {
+#   events(search: "yoga", category: ["outdoors-and-active"], isFree: true) {
+#     ok
+#     events {
+#       ...EventCard
+#     }
+#   }
+# }
+
+# Example 2: Get events near user's location
+# query {
+#   events(latitude: -1.2921, longitude: 36.8219, radiusKm: 10) {
+#     ok
+#     events {
+#       ...EventCard
+#     }
+#   }
+# }
+
+# Example 3: Get full event details for display
+# query {
+#   event(id: "abc123") {
+#     ok
+#     event {
+#       ...EventDetail
+#     }
+#   }
+# }
+
+# Example 4: Determine event type on frontend
+# - If isInternal=true, isFree=true → Type A (internal, free)
+# - If isInternal=true, isFree=false → Type B (internal, paid with ticketing)
+# - If isExternal=true, isFree=true → Type C (external, free)
+# - If isExternal=true, isFree=false → Type D (external, paid)
+
+# Example 5: Handle CTAs based on event type
+# if (event.isExternal) {
+#   // Show two buttons:
+#   // 1. "Open Link" → opens event.moreDetailsUrl
+#   // 2. "I'm Going" → calls markGoing mutation
+# } else if (event.ticketingEnabled) {
+#   // Internal paid event (Type B)
+#   if (event.userTicket) {
+#     // Show "View Ticket" → navigate to ticket screen
+#   } else {
+#     // Show "Buy Ticket" → navigate to checkout
+#   }
+# } else {
+#   // Internal free event (Type A)
+#   // Show "I'm Going" RSVP toggle
+# }

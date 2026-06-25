@@ -15,7 +15,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.core.models import Category
-from apps.events.models import EditorsPick, Event, UserEvents
+from apps.events.models import EditorsPick, Event, EventGoing, TicketTier, UserEvents
 from apps.events.utils.unsplash import (
     fetch_unsplash_gallery_images,
     fetch_unsplash_image_url,
@@ -32,19 +32,43 @@ class Command(BaseCommand):
         self.stdout.write(self.style.WARNING("\n🗑️  Flushing existing data (preserving users)...\n"))
 
         with transaction.atomic():
-            # Flush event-related data
+            # Flush event-related data in correct order (respecting foreign key constraints)
+            # Delete in order: dependent objects first, then what they depend on
             UserEvents.objects.all().delete()
+            EventGoing.objects.all().delete()
             EditorsPick.objects.all().delete()
-            Event.objects.all().delete()
             Trip.objects.all().delete()
+
+            # Delete orders/tickets before events and ticket tiers (due to PROTECT constraints)
+            from apps.tickets.models import Ticket
+            from apps.payments.models import MPESATransaction, OrderItem, Order
+            from apps.organizers.models import OrganizerPayout
+
+            # Delete payouts first (they reference orders with PROTECT)
+            OrganizerPayout.objects.all().delete()
+
+            # Then delete tickets, orders, and related
+            Ticket.objects.all().delete()
+            MPESATransaction.objects.all().delete()
+            OrderItem.objects.all().delete()
+            Order.objects.all().delete()
+
+            # Now safe to delete ticket tiers and events
+            TicketTier.objects.all().delete()
+            Event.objects.all().delete()
             Category.objects.all().delete()
 
             self.stdout.write(self.style.SUCCESS("✓ Flushed all event data\n"))
 
-            # Seed organizer
-            self.stdout.write("👤 Creating organizer...")
-            organizer = self._seed_organizer()
-            self.stdout.write(self.style.SUCCESS(f"✓ Created organizer: {organizer.business_name}\n"))
+            # Seed organizers
+            self.stdout.write("👤 Creating organizers...")
+            organizers = self._seed_organizers()
+            self.stdout.write(self.style.SUCCESS(f"✓ Created {len(organizers)} organizers\n"))
+
+            # Seed users
+            self.stdout.write("👥 Creating users...")
+            user_count = self._seed_users()
+            self.stdout.write(self.style.SUCCESS(f"✓ Created/verified {user_count} users\n"))
 
             # Seed categories
             self.stdout.write("📂 Creating categories...")
@@ -53,8 +77,13 @@ class Command(BaseCommand):
 
             # Seed events
             self.stdout.write("🎉 Creating events...")
-            events = self._seed_events(categories, organizer)
+            events = self._seed_events(categories, organizers)
             self.stdout.write(self.style.SUCCESS(f"✓ Created {len(events)} events\n"))
+
+            # Seed ticket tiers
+            self.stdout.write("🎫 Creating ticket tiers...")
+            tiers_count = self._seed_ticket_tiers(events)
+            self.stdout.write(self.style.SUCCESS(f"✓ Created {tiers_count} ticket tiers\n"))
 
             # Seed user interactions
             self.stdout.write("❤️  Creating user interactions...")
@@ -66,43 +95,132 @@ class Command(BaseCommand):
             picks_count = self._seed_editors_picks(events)
             self.stdout.write(self.style.SUCCESS(f"✓ Created {picks_count} editor's picks\n"))
 
-            # Seed trips
-            self.stdout.write("✈️  Creating trips...")
-            trips_count = self._seed_trips(events)
-            self.stdout.write(self.style.SUCCESS(f"✓ Created {trips_count} trips\n"))
+            # # Trips feature temporarily removed — seed commented out
+            # # TODO: re-enable when trips feature is restored
+            # self.stdout.write("✈️  Creating trips...")
+            # trips_count = self._seed_trips(events)
+            # self.stdout.write(self.style.SUCCESS(f"✓ Created {trips_count} trips\n"))
 
             self.stdout.write(
                 self.style.SUCCESS(
-                    f"\n✅ Seed complete: {len(events)} events, {interaction_count} interactions, {picks_count} picks, {trips_count} trips\n"
+                    f"\n✅ Seed complete: {len(events)} events, {interaction_count} interactions, {picks_count} picks\n"
                 )
             )
 
-    def _seed_organizer(self):
-        """Create a default organizer for seeded events"""
-        # Get or create a default organizer user
-        user, _ = User.objects.get_or_create(
-            email="organizer@pursuitapp.co.ke",
-            defaults={
-                "first_name": "Pursuit",
+    def _seed_organizers(self):
+        """Create 5 internal Pursuit organizers with realistic Nairobi names"""
+        organizers_data = [
+            {
+                "email": "skybar@pursuitapp.co.ke",
+                "first_name": "Sky",
+                "last_name": "Lounge",
+                "business_name": "Rooftop Nairobi",
+                "description": "Elevated experiences in the heart of Westlands. Premium rooftop venue for live music, sundowners, and private events.",
+                "website_url": "https://rooftopnairobi.co.ke",
+                "contact_email": "events@rooftopnairobi.co.ke",
+            },
+            {
+                "email": "artcollective@pursuitapp.co.ke",
+                "first_name": "Nairobi",
+                "last_name": "Arts",
+                "business_name": "The Creative Hive",
+                "description": "Contemporary arts collective showcasing emerging East African talent through exhibitions, workshops, and cultural events.",
+                "contact_email": "hello@creativehive.co.ke",
+            },
+            {
+                "email": "wellness@pursuitapp.co.ke",
+                "first_name": "Zen",
+                "last_name": "Studios",
+                "business_name": "Movement & Mindfulness Studio",
+                "description": "Holistic wellness space offering yoga, pilates, meditation, and fitness classes in Karen.",
+                "website_url": "https://movementmindfulness.co.ke",
+                "contact_email": "studio@movementmindfulness.co.ke",
+            },
+            {
+                "email": "techcommunity@pursuitapp.co.ke",
+                "first_name": "Tech",
+                "last_name": "Nairobi",
+                "business_name": "Nairobi Tech Collective",
+                "description": "Community-driven tech events, hackathons, and networking for developers, founders, and innovators.",
+                "contact_email": "connect@nairotechcollective.org",
+            },
+            {
+                "email": "foodevents@pursuitapp.co.ke",
+                "first_name": "Flavor",
                 "last_name": "Events",
-                "is_active": True,
-            }
-        )
+                "business_name": "Nairobi Flavor Co.",
+                "description": "Curating unforgettable food and dining experiences — from street food festivals to fine dining pop-ups.",
+                "website_url": "https://nairobiflavorco.com",
+                "contact_email": "bookings@nairobiflavorco.com",
+            },
+        ]
 
-        # Create organizer profile
-        organizer, _ = OrganizerProfile.objects.get_or_create(
-            user=user,
-            defaults={
-                "business_name": "Pursuit Events HQ",
-                "verified": True,
-            }
-        )
+        organizers = []
+        for org_data in organizers_data:
+            user, _ = User.objects.get_or_create(
+                email=org_data["email"],
+                defaults={
+                    "first_name": org_data["first_name"],
+                    "last_name": org_data["last_name"],
+                    "is_active": True,
+                    "username": org_data["email"].split("@")[0],
+                }
+            )
 
-        return organizer
+            organizer, _ = OrganizerProfile.objects.get_or_create(
+                user=user,
+                defaults={
+                    "business_name": org_data["business_name"],
+                    "description": org_data.get("description", ""),
+                    "website_url": org_data.get("website_url", ""),
+                    "contact_email": org_data.get("contact_email", ""),
+                    "verified": True,
+                }
+            )
+            organizers.append(organizer)
+
+        return organizers
+
+    def _seed_users(self):
+        """Create 18 users with realistic Nairobi names"""
+        users_data = [
+            # Special user - must exist and have most interactions
+            {"email": "faithcathy12@gmail.com", "first_name": "Faith", "last_name": "Catherine"},
+            # Additional users with realistic Kenyan names
+            {"email": "kamau.njoroge@gmail.com", "first_name": "Kamau", "last_name": "Njoroge"},
+            {"email": "wanjiru.kariuki@outlook.com", "first_name": "Wanjiru", "last_name": "Kariuki"},
+            {"email": "brian.otieno@gmail.com", "first_name": "Brian", "last_name": "Otieno"},
+            {"email": "amina.hassan@gmail.com", "first_name": "Amina", "last_name": "Hassan"},
+            {"email": "dennis.kiprop@outlook.com", "first_name": "Dennis", "last_name": "Kiprop"},
+            {"email": "mercy.achieng@gmail.com", "first_name": "Mercy", "last_name": "Achieng"},
+            {"email": "kevin.mwangi@gmail.com", "first_name": "Kevin", "last_name": "Mwangi"},
+            {"email": "rachel.wambui@outlook.com", "first_name": "Rachel", "last_name": "Wambui"},
+            {"email": "john.omondi@gmail.com", "first_name": "John", "last_name": "Omondi"},
+            {"email": "esther.njeri@gmail.com", "first_name": "Esther", "last_name": "Njeri"},
+            {"email": "alex.kimani@outlook.com", "first_name": "Alex", "last_name": "Kimani"},
+            {"email": "grace.wanjiku@gmail.com", "first_name": "Grace", "last_name": "Wanjiku"},
+            {"email": "steve.ochieng@gmail.com", "first_name": "Steve", "last_name": "Ochieng"},
+            {"email": "naomi.chebet@outlook.com", "first_name": "Naomi", "last_name": "Chebet"},
+            {"email": "victor.mutua@gmail.com", "first_name": "Victor", "last_name": "Mutua"},
+            {"email": "linda.adhiambo@gmail.com", "first_name": "Linda", "last_name": "Adhiambo"},
+            {"email": "mark.kimutai@outlook.com", "first_name": "Mark", "last_name": "Kimutai"},
+        ]
+
+        for user_data in users_data:
+            User.objects.get_or_create(
+                email=user_data["email"],
+                defaults={
+                    "first_name": user_data["first_name"],
+                    "last_name": user_data.get("last_name", ""),
+                    "is_active": True,
+                    "username": user_data["email"].split("@")[0],
+                }
+            )
+
+        return len(users_data)
 
     def _seed_categories(self):
         """Create the 8 core categories"""
-        # Map slug to category data for easier lookup
         category_map = {
             "concerts-and-nightlife": {"name": "Concerts & Nightlife", "icon": "🎵", "color": "#1a1a2e"},
             "outdoors-and-active": {"name": "Outdoors & Active", "icon": "🏃", "color": "#59904a"},
@@ -121,703 +239,223 @@ class Command(BaseCommand):
 
         return categories
 
-    def _seed_events(self, categories, organizer):
-        """Create 50 diverse events across all categories and time ranges"""
+    def _seed_events(self, categories, organizers):
+        """
+        Create 50+ diverse events across 4 event types:
+        - Type A: Internal organizer, Free (ticketing_enabled=False)
+        - Type B: Internal organizer, Paid (ticketing_enabled=True)
+        - Type C: External organizer, Free (ticketing_enabled=False, has more_details_url)
+        - Type D: External organizer, Paid (ticketing_enabled=False, has more_details_url)
+        """
         nairobi_tz = ZoneInfo("Africa/Nairobi")
         now = timezone.now().astimezone(nairobi_tz)
 
+        import random
+        random.seed(42)  # Deterministic for reproducibility
+
         events_data = [
-            # CONCERTS & NIGHTLIFE (8 events)
+            # TYPE A: Internal, Free — 15 events
             {
-                "name": "Blankets & Wine: Afrobeat Edition",
-                "description": "Nairobi's iconic outdoor music festival returns with a stellar Afrobeat lineup. Expect performances from Sauti Sol, Nviiri the Storyteller, and surprise guest acts. Gates open at 2pm — bring a blanket and sunscreen. Pro tip: the left side of the stage near the food trucks has the best sound and shade by 5pm.",
-                "category": "concerts-and-nightlife",
-                "venue": "Ngong Racecourse",
-                "neighbourhood": "Ngong Road",
-                "location_tag": "nairobi",
-                "lat": -1.3062,
-                "lng": 36.7586,
-                "price": Decimal("2500"),
-                "ticketing_enabled": True,
-                "available_tickets": 450,
-                "going_count": 387,
-                "series_name": "Blankets & Wine",
-                "start_offset_hours": 72,  # This weekend
-                "duration_hours": 8,
-            },
-            {
-                "name": "Jazz Mondays at Alchemist",
-                "description": "Intimate live jazz session with rotating local and regional acts. This week features the Nairobi Horns Project. Full bar and kitchen available. No cover charge, but arrive by 8pm to secure courtyard seating — indoor gets packed and the sound isn't as crisp.",
-                "category": "concerts-and-nightlife",
-                "venue": "Alchemist Bar",
-                "neighbourhood": "Westlands",
-                "location_tag": "nairobi",
-                "lat": -1.2673,
-                "lng": 36.8073,
-                "price": Decimal("0"),
-                "ticketing_enabled": False,
-                "available_tickets": None,
-                "going_count": 67,
-                "series_name": "Jazz Mondays",
-                "start_offset_hours": 4,  # Tonight
-                "duration_hours": 4,
-                "more_details_url": "https://alchemistbar.co.ke/events",
-            },
-            {
-                "name": "Nyege Nyege Nairobi: Electronic Music Showcase",
-                "description": "East Africa's premier electronic music festival brings its Nairobi edition. Four stages, 30+ DJs, experimental beats from Kampala to Kinshasa. 18+ only, ID required at the door. The upper deck at the main stage is less crowded and has better ventilation.",
-                "category": "concerts-and-nightlife",
-                "venue": "Ngong Racecourse",
-                "neighbourhood": "Ngong Road",
-                "location_tag": "nairobi",
-                "lat": -1.3062,
-                "lng": 36.7586,
-                "price": Decimal("3500"),
-                "ticketing_enabled": True,
-                "available_tickets": 280,
-                "going_count": 412,
-                "start_offset_hours": 168,  # Next week
-                "duration_hours": 10,
-            },
-            {
-                "name": "Rhumba Night: Congolese Classics",
-                "description": "Live Congolese rhumba band performing hits from Koffi Olomide, Fally Ipupa, and Madilu System. Full dinner service available. Smart casual dress code. Get there before 9pm — the dance floor fills fast and parking becomes a nightmare.",
-                "category": "concerts-and-nightlife",
-                "venue": "Alchemist Bar",
-                "neighbourhood": "Westlands",
-                "location_tag": "nairobi",
-                "lat": -1.2673,
-                "lng": 36.8073,
-                "price": Decimal("1500"),
-                "ticketing_enabled": True,
-                "available_tickets": 120,
-                "going_count": 89,
-                "start_offset_hours": 336,  # Week 2
-                "duration_hours": 5,
-            },
-            {
-                "name": "Reggae Sundays at Carnivore",
-                "description": "Open-air reggae session with DJ Fully Focus and live drum circle. Nyama choma and cocktails available. Free entry, pay-as-you-eat. Bring cash — M-Pesa at the bar has been unreliable lately.",
-                "category": "concerts-and-nightlife",
-                "venue": "Carnivore Restaurant",
-                "neighbourhood": "Langata",
-                "location_tag": "nairobi",
-                "lat": -1.3297,
-                "lng": 36.8092,
-                "price": Decimal("0"),
-                "ticketing_enabled": False,
-                "available_tickets": None,
-                "going_count": 134,
-                "series_name": "Reggae Sundays",
-                "start_offset_hours": 96,  # This weekend
-                "duration_hours": 6,
-                "more_details_url": "https://tamarind.co.ke/carnivore",
-            },
-            {
-                "name": "Amapiano Block Party: South African Invasion",
-                "description": "All-night amapiano session with DJs from Johannesburg and Lagos. Two floors, outdoor smoking lounge, full bar. 18+ strictly enforced. The rooftop section opens at 11pm and has better air circulation — worth the wait.",
-                "category": "concerts-and-nightlife",
-                "venue": "PAWA254",
-                "neighbourhood": "Nairobi West",
-                "location_tag": "nairobi",
-                "lat": -1.3152,
-                "lng": 36.8322,
-                "price": Decimal("800"),
-                "ticketing_enabled": True,
-                "available_tickets": 200,
-                "going_count": 156,
-                "start_offset_hours": 504,  # Week 3
-                "duration_hours": 8,
-            },
-            {
-                "name": "Taarab Night: Coastal Music in the City",
-                "description": "Traditional Swahili taarab music performed by Mombasa's Zuhura Swaleh and her ensemble. Intimate seated venue, limited capacity. Snacks and coastal-inspired cocktails. This is a rare Nairobi appearance — book early.",
-                "category": "concerts-and-nightlife",
-                "venue": "GoDown Arts Centre",
-                "neighbourhood": "Ngara",
-                "location_tag": "nairobi",
-                "lat": -1.2699,
-                "lng": 36.8387,
-                "price": Decimal("1200"),
-                "ticketing_enabled": True,
-                "available_tickets": 0,  # SOLD OUT
-                "going_count": 95,
-                "start_offset_hours": 240,  # Week 2
-                "duration_hours": 3,
-            },
-            {
-                "name": "Open Mic Comedy & Music Jam",
-                "description": "Weekly open mic for comedians, poets, and musicians. Sign-up starts at 7pm, show at 8pm. Free entry, drink minimum KES 500. Snacks available. The back corner tables have the best view without being too close to hecklers.",
-                "category": "concerts-and-nightlife",
-                "venue": "Alchemist Bar",
-                "neighbourhood": "Westlands",
-                "location_tag": "nairobi",
-                "lat": -1.2673,
-                "lng": 36.8073,
-                "price": Decimal("0"),
-                "ticketing_enabled": False,
-                "available_tickets": None,
-                "going_count": 43,
-                "series_name": "Open Mic Tuesdays",
-                "start_offset_hours": 672,  # Week 4
-                "duration_hours": 4,
-                "more_details_url": "https://alchemistbar.co.ke/events",
-            },
-            # OUTDOORS & ACTIVE (7 events)
-            {
-                "name": "Karura Forest Morning Run: 10K Trail",
-                "description": "Guided group run through Karura's scenic trails. All fitness levels welcome, water stations every 2km. Meet at the main gate. Bring your own water bottle — the forest taps run slow in dry season. Entry fee covers forest conservation.",
-                "category": "outdoors-and-active",
-                "venue": "Karura Forest",
-                "neighbourhood": "Gigiri",
-                "location_tag": "nairobi",
-                "lat": -1.2404,
-                "lng": 36.8394,
-                "price": Decimal("300"),
-                "ticketing_enabled": True,
-                "available_tickets": 150,
-                "going_count": 78,
-                "series_name": "Karura Runners",
-                "start_offset_hours": 15,  # Tomorrow morning
-                "duration_hours": 2,
-            },
-            {
-                "name": "Ngong Hills Sunrise Hike",
-                "description": "Challenging 3-hour hike to catch sunrise over the Rift Valley. Depart Nairobi at 5am, return by 11am. Moderate fitness required. Bring layered clothing and sturdy shoes — it's windy and muddy at the top even in dry season.",
-                "category": "outdoors-and-active",
-                "venue": "Ngong Hills",
-                "neighbourhood": "Ngong",
-                "location_tag": "nairobi",
-                "lat": -1.3917,
-                "lng": 36.6516,
-                "price": Decimal("1500"),
-                "ticketing_enabled": True,
-                "available_tickets": 45,
-                "going_count": 38,
-                "start_offset_hours": 72,  # This weekend
-                "duration_hours": 6,
-            },
-            {
-                "name": "Cycle the City: Nairobi Bike Tour",
-                "description": "Guided 15km bike tour through Nairobi's neighborhoods — from Uhuru Park to Kibera viewpoint to CBD. Bikes and helmets provided. Moderate pace with photo stops. Traffic is lighter on Sundays, but bring sunscreen regardless.",
+                "name": "Sunday Morning Yoga in the Park",
+                "description": "Free community yoga session at Uhuru Park. All levels welcome. Bring your own mat and water. We meet near the central fountain at 7am sharp. Great way to start your Sunday with mindfulness and movement.",
                 "category": "outdoors-and-active",
                 "venue": "Uhuru Park",
-                "neighbourhood": "CBD",
                 "location_tag": "nairobi",
                 "lat": -1.2833,
                 "lng": 36.8172,
-                "price": Decimal("2000"),
-                "ticketing_enabled": True,
-                "available_tickets": 25,
-                "going_count": 19,
-                "start_offset_hours": 96,  # This weekend
-                "duration_hours": 3,
+                "price": Decimal("0"),
+                "ticketing_enabled": False,
+                "available_tickets": None,
+                "going_count": 42,
+                "event_type": "A",
+                "start_offset_hours": -120,  # Past event
+                "duration_hours": 2,
             },
             {
-                "name": "Rock Climbing at Hell's Gate",
-                "description": "Day trip to Hell's Gate National Park for rock climbing and gorge exploration. Transport from Nairobi included. All equipment provided, beginner-friendly. Bring packed lunch and 2L water minimum — the park has limited food options and it gets hot.",
-                "category": "outdoors-and-active",
-                "venue": "Hell's Gate National Park",
-                "neighbourhood": "Naivasha",
-                "location_tag": "naivasha",
-                "lat": -0.9186,
-                "lng": 36.3111,
-                "price": Decimal("4500"),
-                "ticketing_enabled": True,
-                "available_tickets": 20,
-                "going_count": 16,
-                "start_offset_hours": 168,  # Next week
-                "duration_hours": 10,
+                "name": "Open Mic Night at Alchemist",
+                "description": "Free entry open mic for poets, comedians, and musicians. Sign up at 7pm, show starts at 8pm. Drink minimum KES 500. Supportive crowd, all levels of experience welcome. The back tables have the best acoustics.",
+                "category": "culture-and-arts",
+                "venue": "Alchemist Bar",
+                "location_tag": "nairobi",
+                "lat": -1.2673,
+                "lng": 36.8073,
+                "price": Decimal("0"),
+                "ticketing_enabled": False,
+                "available_tickets": None,
+                "going_count": 38,
+                "event_type": "A",
+                "start_offset_hours": 5,  # Tonight
+                "duration_hours": 4,
             },
             {
                 "name": "Parkrun Nairobi: 5K Saturday Run",
-                "description": "Free weekly 5K run at Karura Forest. Timed run, all abilities welcome. Register online before your first run. Kids' 2K starts at 8am. Bring barcode — registration desk closes at 9am sharp.",
+                "description": "Free weekly 5K timed run at Karura Forest. All abilities welcome. Register online before your first run. Kids' 2K starts at 8am. Arrive with your barcode by 8:45am — registration desk closes at 9am sharp.",
                 "category": "outdoors-and-active",
                 "venue": "Karura Forest",
-                "neighbourhood": "Gigiri",
                 "location_tag": "nairobi",
                 "lat": -1.2404,
                 "lng": 36.8394,
                 "price": Decimal("0"),
                 "ticketing_enabled": False,
                 "available_tickets": None,
-                "going_count": 210,
-                "series_name": "Parkrun Nairobi",
+                "going_count": 187,
+                "event_type": "A",
                 "start_offset_hours": 72,  # This weekend
-                "duration_hours": 1,
-                "more_details_url": "https://www.parkrun.com/nairobi/",
-            },
-            {
-                "name": "Mt. Longonot Crater Hike",
-                "description": "Challenging full-day hike up Mt. Longonot with crater rim walk. Stunning Rift Valley views. Transport from Nairobi included, park fees covered. Start early — the final ascent is steep and exposed to sun. Bring 3L water per person.",
-                "category": "outdoors-and-active",
-                "venue": "Mt. Longonot National Park",
-                "neighbourhood": "Naivasha",
-                "location_tag": "naivasha",
-                "lat": -0.9148,
-                "lng": 36.4461,
-                "price": Decimal("3000"),
-                "ticketing_enabled": True,
-                "available_tickets": 35,
-                "going_count": 27,
-                "start_offset_hours": 336,  # Week 2
-                "duration_hours": 8,
-            },
-            {
-                "name": "Outdoor Yoga at Arboretum",
-                "description": "Morning vinyasa flow class in the serene Nairobi Arboretum. All levels, mats provided. Followed by optional brunch at the on-site café. Arrive 10 minutes early to secure a shaded spot — the sun gets intense by 10am.",
-                "category": "outdoors-and-active",
-                "venue": "Nairobi Arboretum",
-                "neighbourhood": "Kilimani",
-                "location_tag": "nairobi",
-                "lat": -1.2820,
-                "lng": 36.8084,
-                "price": Decimal("800"),
-                "ticketing_enabled": True,
-                "available_tickets": 30,
-                "going_count": 24,
-                "series_name": "Arboretum Yoga",
-                "start_offset_hours": 504,  # Week 3
                 "duration_hours": 2,
-            },
-            # FOOD & DRINK (7 events)
-            {
-                "name": "Street Food Festival: Nairobi Eats",
-                "description": "Two-day celebration of Nairobi's street food scene. 40+ vendors serving everything from mutura to bhajia to artisan burgers. Live music, beer garden, kids' zone. Cash and M-Pesa accepted. Go early on Saturday — Sunday runs out of the popular stalls by 3pm.",
-                "category": "food-and-drink",
-                "venue": "Ngong Racecourse",
-                "neighbourhood": "Ngong Road",
-                "location_tag": "nairobi",
-                "lat": -1.3062,
-                "lng": 36.7586,
-                "price": Decimal("500"),
-                "ticketing_enabled": True,
-                "available_tickets": 800,
-                "going_count": 564,
-                "start_offset_hours": 168,  # Next week
-                "duration_hours": 48,
-                "has_gallery": True,
-                "gallery_description": "Photos from last year's festival showing the variety of food stalls, live music performances, and the vibrant crowd. Includes close-ups of signature dishes from top vendors.",
+                "series_name": "Parkrun Nairobi",
             },
             {
-                "name": "Wine & Cheese Pairing Masterclass",
-                "description": "Guided tasting of 6 wines paired with artisanal cheeses from Kenya and beyond. Expert sommelier walks you through flavor profiles. Limited to 20 guests for intimate experience. Book early — this sells out within hours of announcement.",
-                "category": "food-and-drink",
-                "venue": "Alliance Française",
-                "neighbourhood": "Westlands",
-                "location_tag": "nairobi",
-                "lat": -1.2644,
-                "lng": 36.8078,
-                "price": Decimal("3500"),
-                "ticketing_enabled": True,
-                "available_tickets": 5,  # Almost sold out
-                "going_count": 18,
-                "start_offset_hours": 240,  # Week 2
-                "duration_hours": 3,
-            },
-            {
-                "name": "Cultiva Farm: Sunset Supper Club",
-                "description": "Farm-to-table 5-course dinner in the Tigoni hills. All ingredients sourced from the farm and neighboring smallholders. BYOB wine policy, corkage-free. Bring a warm layer — evenings get chilly at this altitude even in summer.",
-                "category": "food-and-drink",
-                "venue": "Cultiva Farm",
-                "neighbourhood": "Tigoni",
-                "location_tag": "naivasha",
-                "lat": -1.1167,
-                "lng": 36.6833,
-                "price": Decimal("4500"),
-                "ticketing_enabled": True,
-                "available_tickets": 24,
-                "going_count": 20,
-                "start_offset_hours": 336,  # Week 2
-                "duration_hours": 4,
-            },
-            {
-                "name": "Nairobi Coffee Crawl",
-                "description": "Guided walking tour visiting 5 of Nairobi's best specialty coffee roasters. Learn about Kenyan coffee production, cupping techniques, and brewing methods. Includes tastings at each stop. Wear comfortable shoes — it's 3km of walking.",
-                "category": "food-and-drink",
-                "venue": "Nairobi CBD",
-                "neighbourhood": "CBD",
-                "location_tag": "nairobi",
-                "lat": -1.2864,
-                "lng": 36.8172,
-                "price": Decimal("2500"),
-                "ticketing_enabled": True,
-                "available_tickets": 15,
-                "going_count": 12,
-                "start_offset_hours": 96,  # This weekend
-                "duration_hours": 3,
-            },
-            {
-                "name": "Vegan Brunch Pop-Up at Spring Valley",
-                "description": "Plant-based brunch featuring innovative takes on Kenyan classics. Think ugali made from purple sweet potato, coconut-based nyama choma substitute, and passion fruit mimosas. Outdoor seating in a garden setting. Limited capacity, no walk-ins.",
-                "category": "food-and-drink",
-                "venue": "Spring Valley Community Market",
-                "neighbourhood": "Spring Valley",
-                "location_tag": "nairobi",
-                "lat": -1.2642,
-                "lng": 36.7886,
-                "price": Decimal("1800"),
-                "ticketing_enabled": True,
-                "available_tickets": 40,
-                "going_count": 31,
-                "start_offset_hours": 72,  # This weekend
-                "duration_hours": 3,
-            },
-            {
-                "name": "Craft Beer Tasting: East African Breweries",
-                "description": "Sample 8 craft beers from Kenya, Tanzania, and Uganda. Meet the brewers, learn the stories behind each brew. Light bites included. Held at Brew Bistro's outdoor terrace. Come thirsty — it's generous pours.",
-                "category": "food-and-drink",
-                "venue": "Brew Bistro",
-                "neighbourhood": "Westlands",
-                "location_tag": "nairobi",
-                "lat": -1.2650,
-                "lng": 36.8100,
-                "price": Decimal("2000"),
-                "ticketing_enabled": True,
-                "available_tickets": 35,
-                "going_count": 28,
-                "start_offset_hours": 504,  # Week 3
-                "duration_hours": 3,
-            },
-            {
-                "name": "BBQ & Beats Sunday Session",
-                "description": "All-you-can-eat nyama choma buffet with live DJ. Goat, chicken, beef, and veggie options. Sides and salads included. Cash bar. Family-friendly until 6pm. Get the corner tables near the grill — freshest cuts come straight from there.",
-                "category": "food-and-drink",
-                "venue": "Carnivore Restaurant",
-                "neighbourhood": "Langata",
-                "location_tag": "nairobi",
-                "lat": -1.3297,
-                "lng": 36.8092,
-                "price": Decimal("3200"),
-                "ticketing_enabled": True,
-                "available_tickets": 100,
-                "going_count": 78,
-                "start_offset_hours": 672,  # Week 4
-                "duration_hours": 5,
-            },
-            # CULTURE & ARTS (7 events)
-            {
-                "name": "Contemporary Kenyan Art: New Voices Exhibition",
-                "description": "Month-long exhibition featuring 15 emerging Kenyan visual artists. Paintings, sculpture, mixed media, and installations exploring themes of identity, urbanization, and climate. Opening reception this Friday with artist talks. Gallery is air-conditioned — a refuge from the midday heat.",
-                "category": "culture-and-arts",
-                "venue": "Circle Art Gallery",
-                "neighbourhood": "Lavington",
-                "location_tag": "nairobi",
-                "lat": -1.2836,
-                "lng": 36.7661,
-                "price": Decimal("0"),
-                "ticketing_enabled": False,
-                "available_tickets": None,
-                "going_count": 142,
-                "start_offset_hours": 4,  # Tonight
-                "duration_hours": 720,  # 30 days
-                "more_details_url": "https://www.circleartgallery.com/",
-                "has_gallery": True,
-                "gallery_description": "Preview images of featured artworks including Wanjiru Kinyanjui's 'Urban Sprawl' series and Kamau Mwangi's sculptural installations. Gallery views and opening night photos from previous exhibitions.",
-            },
-            {
-                "name": "Afro-Fusion Dance Workshop",
-                "description": "3-hour intensive combining traditional African dance with contemporary and hip-hop styles. Beginner-friendly, no experience required. Wear comfortable athletic clothes and bring water. The GoDown studio gets warm — the ceiling fans help but it's still a workout.",
+                "name": "Community Art Exhibition Opening Night",
+                "description": "Free opening reception for local artists' exhibition. Wine and light bites served. Meet the artists, enjoy the work, and support the Nairobi creative community. Exhibition runs for 2 weeks after opening.",
                 "category": "culture-and-arts",
                 "venue": "GoDown Arts Centre",
-                "neighbourhood": "Ngara",
                 "location_tag": "nairobi",
                 "lat": -1.2699,
                 "lng": 36.8387,
-                "price": Decimal("1200"),
-                "ticketing_enabled": True,
-                "available_tickets": 25,
-                "going_count": 18,
-                "start_offset_hours": 96,  # This weekend
-                "duration_hours": 3,
-            },
-            {
-                "name": "Nairobi International Film Festival",
-                "description": "Week-long showcase of African and international cinema. 40+ films across documentary, feature, and short categories. This year's focus: climate stories from the Global South. Opening night gala includes Q&A with filmmakers. Book multi-day passes for best value.",
-                "category": "culture-and-arts",
-                "venue": "Alliance Française",
-                "neighbourhood": "Westlands",
-                "location_tag": "nairobi",
-                "lat": -1.2644,
-                "lng": 36.8078,
-                "price": Decimal("800"),
-                "ticketing_enabled": True,
-                "available_tickets": 180,
-                "going_count": 156,
-                "start_offset_hours": 336,  # Week 2
-                "duration_hours": 168,  # 7 days
-                "more_details_url": "https://www.alliance-francaise.or.ke",
-                "has_gallery": True,
-                "gallery_description": "Film stills from this year's featured selections and behind-the-scenes photos from the festival setup. Includes shots of past opening night galas and audience reactions.",
-            },
-            {
-                "name": "Poetry Slam: Spoken Word Showcase",
-                "description": "Open mic poetry night with featured performers from Nairobi's slam poetry scene. Sign up to perform or just enjoy the show. Cash bar and light snacks. The basement venue at PAWA has incredible acoustics — no mic needed for the intimate crowd.",
-                "category": "culture-and-arts",
-                "venue": "PAWA254",
-                "neighbourhood": "Nairobi West",
-                "location_tag": "nairobi",
-                "lat": -1.3152,
-                "lng": 36.8322,
-                "price": Decimal("500"),
-                "ticketing_enabled": True,
-                "available_tickets": 60,
-                "going_count": 42,
+                "price": Decimal("0"),
+                "ticketing_enabled": False,
+                "available_tickets": None,
+                "going_count": 94,
+                "event_type": "A",
                 "start_offset_hours": 168,  # Next week
                 "duration_hours": 3,
             },
             {
-                "name": "Kiswahili Theatre: Machozi ya Maendeleo",
-                "description": "Original play performed in Kiswahili exploring gentrification and displacement in Nairobi's eastlands. Powerful ensemble cast. English subtitles projected. Two-act play with intermission. Seating is first-come — doors open 30 minutes before curtain.",
-                "category": "culture-and-arts",
-                "venue": "Kenya National Theatre",
-                "neighbourhood": "CBD",
-                "location_tag": "nairobi",
-                "lat": -1.2781,
-                "lng": 36.8210,
-                "price": Decimal("1000"),
-                "ticketing_enabled": True,
-                "available_tickets": 150,
-                "going_count": 89,
-                "start_offset_hours": 240,  # Week 2
-                "duration_hours": 3,
-            },
-            {
-                "name": "Beading & Jewelry Making Class",
-                "description": "Learn traditional Maasai beading techniques and create your own jewelry piece to take home. All materials provided. Taught by artisans from the Maasai Market collective. Small class size for personalized instruction. Bring reading glasses if you need them — the beadwork is detailed.",
-                "category": "culture-and-arts",
-                "venue": "The Hub Karen",
-                "neighbourhood": "Karen",
-                "location_tag": "nairobi",
-                "lat": -1.3218,
-                "lng": 36.7073,
-                "price": Decimal("2500"),
-                "ticketing_enabled": True,
-                "available_tickets": 12,
-                "going_count": 9,
-                "start_offset_hours": 504,  # Week 3
-                "duration_hours": 3,
-            },
-            {
-                "name": "Jazz Fusion Concert: Nairobi Horns Project",
-                "description": "The legendary Nairobi Horns Project performs an evening of Afro-jazz fusion. Expect improvisation, call-and-response, and infectious rhythms. Seated venue, limited standing room. Cash bar, no food service. This group rarely plays Nairobi anymore — catch them while you can.",
-                "category": "culture-and-arts",
-                "venue": "Alliance Française",
-                "neighbourhood": "Westlands",
-                "location_tag": "nairobi",
-                "lat": -1.2644,
-                "lng": 36.8078,
-                "price": Decimal("1500"),
-                "ticketing_enabled": True,
-                "available_tickets": 85,
-                "going_count": 71,
-                "start_offset_hours": 672,  # Week 4
-                "duration_hours": 3,
-            },
-            # TALKS & IDEAS (6 events)
-            {
-                "name": "Tech Startup Pitch Night",
-                "description": "Watch 8 Kenyan startups pitch their ideas to a panel of investors. Followed by networking session with founders, VCs, and the tech community. Free entry, drink minimum KES 500. Bring business cards — the networking after is where the real deals happen.",
+                "name": "Tech Meetup: AI & Machine Learning",
+                "description": "Free monthly tech meetup for developers and data scientists. This month: practical applications of AI in Kenyan startups. Networking, pizza, and drinks included. Bring your laptop if you want to follow along with the live demo.",
                 "category": "talks-and-ideas",
                 "venue": "PAWA254",
-                "neighbourhood": "Nairobi West",
                 "location_tag": "nairobi",
                 "lat": -1.3152,
                 "lng": 36.8322,
                 "price": Decimal("0"),
                 "ticketing_enabled": False,
                 "available_tickets": None,
-                "going_count": 98,
-                "start_offset_hours": 168,  # Next week
+                "going_count": 78,
+                "event_type": "A",
+                "start_offset_hours": -240,  # Past event
                 "duration_hours": 3,
-                "more_details_url": "https://pawa254.org",
             },
             {
-                "name": "Climate Change in East Africa: A Panel Discussion",
-                "description": "Environmental scientists, policymakers, and activists discuss climate adaptation strategies for Kenya. Moderated Q&A follows. Light refreshments served. The museum auditorium AC is aggressive — bring a light jacket even on hot days.",
-                "category": "talks-and-ideas",
-                "venue": "Nairobi National Museum",
-                "neighbourhood": "CBD",
+                "name": "Farmers Market at Spring Valley",
+                "description": "Free entry to weekly farmers market. Organic produce, homemade jams, fresh bread, honey, and crafts. Live music and food trucks. Arrive early — best produce sells out by 10am during peak season.",
+                "category": "markets-and-popups",
+                "venue": "Spring Valley Community Market",
                 "location_tag": "nairobi",
-                "lat": -1.2687,
-                "lng": 36.8143,
-                "price": Decimal("500"),
-                "ticketing_enabled": True,
-                "available_tickets": 120,
-                "going_count": 87,
-                "start_offset_hours": 240,  # Week 2
-                "duration_hours": 2,
+                "lat": -1.2642,
+                "lng": 36.7886,
+                "price": Decimal("0"),
+                "ticketing_enabled": False,
+                "available_tickets": None,
+                "going_count": 156,
+                "event_type": "A",
+                "start_offset_hours": 96,  # This weekend
+                "duration_hours": 4,
+                "series_name": "Weekly Farmers Market",
             },
             {
-                "name": "Book Club: Ngũgĩ wa Thiong'o Discussion",
-                "description": "Monthly book club discusses 'The River Between' and Ngũgĩ's influence on African literature. Open to all, come prepared to share your thoughts. Coffee and snacks provided. The discussion gets lively — if you haven't finished the book, you'll still enjoy the conversation.",
+                "name": "Sunset Drum Circle at Karura",
+                "description": "Free community drum circle every Sunday evening. Bring your own drum or percussion, or just come to dance and enjoy the vibe. We gather at the waterfall clearing as the sun sets. Magical energy.",
+                "category": "concerts-and-nightlife",
+                "venue": "Karura Forest",
+                "location_tag": "nairobi",
+                "lat": -1.2404,
+                "lng": 36.8394,
+                "price": Decimal("0"),
+                "ticketing_enabled": False,
+                "available_tickets": None,
+                "going_count": 63,
+                "event_type": "A",
+                "start_offset_hours": -48,  # Past event
+                "duration_hours": 3,
+            },
+            {
+                "name": "Book Club: African Literature Discussion",
+                "description": "Free monthly book club discussing contemporary African writers. This month: Chimamanda Ngozi Adichie's 'Americanah'. Coffee and snacks provided. All welcome, even if you haven't finished the book yet.",
                 "category": "talks-and-ideas",
                 "venue": "Alliance Française",
-                "neighbourhood": "Westlands",
                 "location_tag": "nairobi",
                 "lat": -1.2644,
                 "lng": 36.8078,
+                "price": Decimal("0"),
+                "ticketing_enabled": False,
+                "available_tickets": None,
+                "going_count": 28,
+                "event_type": "A",
+                "start_offset_hours": 336,  # Week 2
+                "duration_hours": 2,
+                "series_name": "Monthly Book Club",
+            },
+            {
+                "name": "Community Clean-Up: Ngong Road Forest",
+                "description": "Free volunteer event to clean up Ngong Road Forest trails. Gloves and trash bags provided. Bring water and sunscreen. We'll meet at the main gate and split into groups. Great way to give back while getting outdoors.",
+                "category": "outdoors-and-active",
+                "venue": "Ngong Road Forest",
+                "location_tag": "nairobi",
+                "lat": -1.3062,
+                "lng": 36.7586,
+                "price": Decimal("0"),
+                "ticketing_enabled": False,
+                "available_tickets": None,
+                "going_count": 51,
+                "event_type": "A",
+                "start_offset_hours": -72,  # Past event
+                "duration_hours": 3,
+            },
+            {
+                "name": "Meditation & Mindfulness Workshop",
+                "description": "Free introduction to meditation and breathwork. Suitable for complete beginners. Mats and cushions provided. Wear comfortable clothes. The studio is air-conditioned and peaceful — a true refuge from city noise.",
+                "category": "workshops-and-classes",
+                "venue": "Movement & Mindfulness Studio",
+                "location_tag": "nairobi",
+                "lat": -1.3218,
+                "lng": 36.7073,
                 "price": Decimal("0"),
                 "ticketing_enabled": False,
                 "available_tickets": None,
                 "going_count": 34,
-                "series_name": "Monthly Book Club",
-                "start_offset_hours": 336,  # Week 2
+                "event_type": "A",
+                "start_offset_hours": 504,  # Week 3
                 "duration_hours": 2,
-                "more_details_url": "https://www.alliance-francaise.or.ke",
             },
             {
-                "name": "Women in Business Breakfast",
-                "description": "Networking breakfast for women entrepreneurs and professionals. Guest speaker: CEO of Safaricom. Panel on access to capital, work-life balance, and building networks. Continental breakfast included. Registration closes 24 hours before — no walk-ins due to catering.",
-                "category": "talks-and-ideas",
-                "venue": "Radisson Blu Hotel",
-                "neighbourhood": "Upper Hill",
+                "name": "Jazz Jam Session at Alchemist",
+                "description": "Free entry weekly jazz jam. Bring your instrument and join in, or just enjoy the music. House band starts at 8pm, open jam from 9pm. The courtyard has the best sound on warm evenings.",
+                "category": "concerts-and-nightlife",
+                "venue": "Alchemist Bar",
                 "location_tag": "nairobi",
-                "lat": -1.2901,
-                "lng": 36.8205,
-                "price": Decimal("1500"),
-                "ticketing_enabled": True,
-                "available_tickets": 80,
-                "going_count": 64,
-                "start_offset_hours": 504,  # Week 3
-                "duration_hours": 3,
-            },
-            {
-                "name": "Photography Workshop: Street Photography Nairobi",
-                "description": "Half-day workshop covering street photography techniques. Morning classroom session followed by guided walk through Nairobi streets. Bring your camera (phone cameras welcome). Lunch included. Instructor is a Magnum photographer — rare opportunity for this level of teaching.",
-                "category": "talks-and-ideas",
-                "venue": "GoDown Arts Centre",
-                "neighbourhood": "Ngara",
-                "location_tag": "nairobi",
-                "lat": -1.2699,
-                "lng": 36.8387,
-                "price": Decimal("3500"),
-                "ticketing_enabled": True,
-                "available_tickets": 15,
-                "going_count": 12,
-                "start_offset_hours": 672,  # Week 4
-                "duration_hours": 5,
-            },
-            {
-                "name": "TEDx Nairobi: Ideas Worth Spreading",
-                "description": "Full-day conference featuring 12 speakers on innovation, culture, and social change. Networking breaks, lunch, and evening reception included. Past speakers include Lupita Nyong'o and Juliani. Book early for early-bird discount — prices rise 2 weeks before event.",
-                "category": "talks-and-ideas",
-                "venue": "Sarit Centre",
-                "neighbourhood": "Westlands",
-                "location_tag": "nairobi",
-                "lat": -1.2617,
-                "lng": 36.7910,
-                "price": Decimal("5000"),
-                "ticketing_enabled": True,
-                "available_tickets": 200,
-                "going_count": 178,
-                "start_offset_hours": 840,  # Week 5
-                "duration_hours": 8,
-            },
-            # WORKSHOPS & CLASSES (6 events)
-            {
-                "name": "Ceramics: Handbuilding Basics",
-                "description": "Learn coil and slab techniques to create functional pottery. No experience needed. All materials and tools provided. Pieces will be fired and glazed — ready for pickup in 3 weeks. Wear clothes that can get dirty — clay stains are permanent.",
-                "category": "workshops-and-classes",
-                "venue": "GoDown Arts Centre",
-                "neighbourhood": "Ngara",
-                "location_tag": "nairobi",
-                "lat": -1.2699,
-                "lng": 36.8387,
-                "price": Decimal("2800"),
-                "ticketing_enabled": True,
-                "available_tickets": 10,
-                "going_count": 8,
-                "start_offset_hours": 96,  # This weekend
+                "lat": -1.2673,
+                "lng": 36.8073,
+                "price": Decimal("0"),
+                "ticketing_enabled": False,
+                "available_tickets": None,
+                "going_count": 45,
+                "event_type": "A",
+                "start_offset_hours": -168,  # Past event
                 "duration_hours": 4,
+                "series_name": "Monday Jazz Sessions",
             },
             {
-                "name": "Kiswahili for Beginners: Conversational Class",
-                "description": "4-week course in basic Kiswahili. One 2-hour session per week. Focused on conversational skills and common phrases. Small class size, interactive exercises. Workbook provided. Classes fill fast with expats — locals welcome too if you never formally learned.",
-                "category": "workshops-and-classes",
-                "venue": "Alliance Française",
-                "neighbourhood": "Westlands",
+                "name": "Startup Founders Coffee Meetup",
+                "description": "Free informal coffee meetup for startup founders and entrepreneurs. Share wins, challenges, and advice. No agenda, just connection. Meet at the upstairs seating area. First-timers always welcome.",
+                "category": "talks-and-ideas",
+                "venue": "Java House Westlands",
                 "location_tag": "nairobi",
-                "lat": -1.2644,
-                "lng": 36.8078,
-                "price": Decimal("4000"),
-                "ticketing_enabled": True,
-                "available_tickets": 12,
-                "going_count": 10,
-                "start_offset_hours": 168,  # Next week
-                "duration_hours": 8,
-            },
-            {
-                "name": "Bread Making Workshop: Sourdough & Artisan Loaves",
-                "description": "Full-day workshop learning to make sourdough starter and bake artisan bread. Hands-on throughout. Each participant bakes 2 loaves to take home. Lunch included. Held at a working bakery — you'll leave smelling like fresh bread.",
-                "category": "workshops-and-classes",
-                "venue": "Spring Valley Community Market",
-                "neighbourhood": "Spring Valley",
-                "location_tag": "nairobi",
-                "lat": -1.2642,
-                "lng": 36.7886,
-                "price": Decimal("3500"),
-                "ticketing_enabled": True,
-                "available_tickets": 8,
-                "going_count": 7,
-                "start_offset_hours": 240,  # Week 2
-                "duration_hours": 6,
-            },
-            {
-                "name": "Digital Marketing for Small Business",
-                "description": "Half-day intensive covering social media strategy, content creation, and analytics. Bring your laptop. Case studies from Kenyan businesses. Coffee and lunch included. The instructor worked at Safaricom for 10 years — practical insights over theory.",
-                "category": "workshops-and-classes",
-                "venue": "PAWA254",
-                "neighbourhood": "Nairobi West",
-                "location_tag": "nairobi",
-                "lat": -1.3152,
-                "lng": 36.8322,
-                "price": Decimal("2500"),
-                "ticketing_enabled": True,
-                "available_tickets": 25,
-                "going_count": 19,
-                "start_offset_hours": 336,  # Week 2
-                "duration_hours": 4,
-            },
-            {
-                "name": "Batik & Tie-Dye: Fabric Art Workshop",
-                "description": "Create your own wearable art using traditional batik and tie-dye techniques. Bring a white cotton item (t-shirt, scarf, pillowcase). All dyes and tools provided. Outdoor workspace — dress for mess and sun. Takes 2 hours to fully dry before you can take it home.",
-                "category": "workshops-and-classes",
-                "venue": "The Hub Karen",
-                "neighbourhood": "Karen",
-                "location_tag": "nairobi",
-                "lat": -1.3218,
-                "lng": 36.7073,
-                "price": Decimal("1800"),
-                "ticketing_enabled": True,
-                "available_tickets": 15,
-                "going_count": 11,
-                "start_offset_hours": 504,  # Week 3
-                "duration_hours": 3,
-            },
-            {
-                "name": "Urban Gardening: Container Vegetable Growing",
-                "description": "Learn to grow vegetables in small spaces — balconies, patios, windowsills. Covers seed selection, soil, watering, and pest management. Each participant plants a starter container to take home. Perfect for apartment dwellers who want to grow their own kale and spinach.",
-                "category": "workshops-and-classes",
-                "venue": "Cultiva Farm",
-                "neighbourhood": "Tigoni",
-                "location_tag": "naivasha",
-                "lat": -1.1167,
-                "lng": 36.6833,
-                "price": Decimal("2000"),
-                "ticketing_enabled": True,
-                "available_tickets": 20,
-                "going_count": 16,
+                "lat": -1.2650,
+                "lng": 36.8100,
+                "price": Decimal("0"),
+                "ticketing_enabled": False,
+                "available_tickets": None,
+                "going_count": 22,
+                "event_type": "A",
                 "start_offset_hours": 672,  # Week 4
-                "duration_hours": 3,
+                "duration_hours": 2,
             },
-            # MARKETS & POPUPS (4 events)
             {
-                "name": "Maasai Market Showcase",
-                "description": "Weekly rotating market featuring Maasai beadwork, fabrics, carvings, and crafts. Over 50 vendors. Haggling expected and encouraged. Proceeds support artisan cooperatives. Bring cash — most vendors don't take M-Pesa, and the ATM runs out on busy days.",
+                "name": "Maasai Market at Village Market",
+                "description": "Free entry weekly market featuring Maasai beadwork, fabrics, carvings, and crafts. Over 50 vendors. Haggling expected and encouraged. Proceeds support artisan cooperatives. Bring cash — most vendors don't take M-Pesa.",
                 "category": "markets-and-popups",
                 "venue": "Village Market",
-                "neighbourhood": "Gigiri",
                 "location_tag": "nairobi",
                 "lat": -1.2300,
                 "lng": 36.8037,
@@ -825,35 +463,364 @@ class Command(BaseCommand):
                 "ticketing_enabled": False,
                 "available_tickets": None,
                 "going_count": 203,
-                "series_name": "Weekly Maasai Market",
-                "start_offset_hours": 72,  # This weekend
+                "event_type": "A",
+                "start_offset_hours": -336,  # Past event
                 "duration_hours": 6,
-                "more_details_url": "https://villagemarket-kenya.com",
+                "series_name": "Weekly Maasai Market",
             },
             {
-                "name": "Farmers Market: Organic Produce & Artisan Goods",
-                "description": "Monthly farmers market with organic vegetables, homemade jams, fresh bread, honey, and crafts. Live music, food trucks, kids' activities. Free entry. Arrive early — the best produce sells out by 10am, especially during dry season.",
-                "category": "markets-and-popups",
-                "venue": "Spring Valley Community Market",
-                "neighbourhood": "Spring Valley",
+                "name": "Photography Walk: Nairobi CBD",
+                "description": "Free guided photo walk through downtown Nairobi. All cameras welcome (including phones). We'll cover street photography basics and explore hidden architectural gems. Meet at Jeevanjee Gardens at 9am.",
+                "category": "culture-and-arts",
+                "venue": "Jeevanjee Gardens",
                 "location_tag": "nairobi",
-                "lat": -1.2642,
-                "lng": 36.7886,
+                "lat": -1.2864,
+                "lng": 36.8242,
                 "price": Decimal("0"),
                 "ticketing_enabled": False,
                 "available_tickets": None,
-                "going_count": 156,
-                "series_name": "Monthly Farmers Market",
+                "going_count": 31,
+                "event_type": "A",
+                "start_offset_hours": 840,  # Week 5
+                "duration_hours": 3,
+            },
+            {
+                "name": "Women in Tech Networking Breakfast",
+                "description": "Free networking breakfast for women in tech and STEM fields. Guest speaker, panel discussion, and breakout networking. Continental breakfast included. A supportive space to connect and grow.",
+                "category": "talks-and-ideas",
+                "venue": "Nairobi Garage",
+                "location_tag": "nairobi",
+                "lat": -1.2617,
+                "lng": 36.7910,
+                "price": Decimal("0"),
+                "ticketing_enabled": False,
+                "available_tickets": None,
+                "going_count": 67,
+                "event_type": "A",
+                "start_offset_hours": -504,  # Past event
+                "duration_hours": 3,
+            },
+
+            # TYPE B: Internal, Paid (with in-app ticketing) — 15 events
+            {
+                "name": "Blankets & Wine: Afrobeat Edition",
+                "description": "Nairobi's iconic outdoor music festival returns with a stellar Afrobeat lineup. Expect performances from Sauti Sol, Nviiri the Storyteller, and surprise guest acts. Gates open at 2pm. Bring a blanket and sunscreen.",
+                "category": "concerts-and-nightlife",
+                "venue": "Ngong Racecourse",
+                "location_tag": "nairobi",
+                "lat": -1.3062,
+                "lng": 36.7586,
+                "price": Decimal("25"),
+                "ticketing_enabled": True,
+                "available_tickets": 450,
+                "going_count": 387,
+                "event_type": "B",
                 "start_offset_hours": 96,  # This weekend
+                "duration_hours": 8,
+                "series_name": "Blankets & Wine",
+            },
+            {
+                "name": "Rooftop Sunset Sessions: Live Band",
+                "description": "Live music on our rooftop terrace with panoramic city views. This week featuring The Nairobi Horns Project. Full bar and kitchen available. Dress code: smart casual. Reserve early — this always sells out.",
+                "category": "concerts-and-nightlife",
+                "venue": "Rooftop Nairobi",
+                "location_tag": "nairobi",
+                "lat": -1.2650,
+                "lng": 36.8100,
+                "price": Decimal("15"),
+                "ticketing_enabled": True,
+                "available_tickets": 120,
+                "going_count": 98,
+                "event_type": "B",
+                "start_offset_hours": 168,  # Next week
+                "duration_hours": 5,
+            },
+            {
+                "name": "Karura Forest Trail Run: 10K Challenge",
+                "description": "Guided 10K trail run through Karura's scenic paths. All fitness levels welcome, water stations every 2km. T-shirt and finisher medal included. Entry fee covers forest conservation. Bring your own hydration pack.",
+                "category": "outdoors-and-active",
+                "venue": "Karura Forest",
+                "location_tag": "nairobi",
+                "lat": -1.2404,
+                "lng": 36.8394,
+                "price": Decimal("5"),
+                "ticketing_enabled": True,
+                "available_tickets": 150,
+                "going_count": 89,
+                "event_type": "B",
+                "start_offset_hours": -96,  # Past event
+                "duration_hours": 3,
+            },
+            {
+                "name": "Street Food Festival: Nairobi Eats",
+                "description": "Two-day celebration of Nairobi's street food scene. 40+ vendors serving mutura, bhajia, artisan burgers, and more. Live music, beer garden, kids' zone. Cash and M-Pesa accepted. Go early on Saturday — Sunday runs out of popular stalls by 3pm.",
+                "category": "food-and-drink",
+                "venue": "Ngong Racecourse",
+                "location_tag": "nairobi",
+                "lat": -1.3062,
+                "lng": 36.7586,
+                "price": Decimal("10"),
+                "ticketing_enabled": True,
+                "available_tickets": 800,
+                "going_count": 564,
+                "event_type": "B",
+                "start_offset_hours": 240,  # Week 2
+                "duration_hours": 48,
+                "has_gallery": True,
+                "gallery_description": "Photos from last year's festival showing the variety of food stalls, live music, and vibrant crowd.",
+            },
+            {
+                "name": "Wine & Cheese Pairing Masterclass",
+                "description": "Guided tasting of 6 wines paired with artisanal cheeses from Kenya and beyond. Expert sommelier walks you through flavor profiles. Limited to 20 guests for intimate experience. Book early — sells out within hours.",
+                "category": "food-and-drink",
+                "venue": "Alliance Française",
+                "location_tag": "nairobi",
+                "lat": -1.2644,
+                "lng": 36.8078,
+                "price": Decimal("35"),
+                "ticketing_enabled": True,
+                "available_tickets": 5,  # Almost sold out
+                "going_count": 18,
+                "event_type": "B",
+                "start_offset_hours": -240,  # Past event
+                "duration_hours": 3,
+            },
+            {
+                "name": "Afro-Fusion Dance Workshop",
+                "description": "3-hour intensive combining traditional African dance with contemporary and hip-hop styles. Beginner-friendly, no experience required. Wear comfortable athletic clothes and bring water. Studio gets warm — ceiling fans help but it's still a workout.",
+                "category": "culture-and-arts",
+                "venue": "GoDown Arts Centre",
+                "location_tag": "nairobi",
+                "lat": -1.2699,
+                "lng": 36.8387,
+                "price": Decimal("12"),
+                "ticketing_enabled": True,
+                "available_tickets": 25,
+                "going_count": 18,
+                "event_type": "B",
+                "start_offset_hours": 336,  # Week 2
+                "duration_hours": 3,
+            },
+            {
+                "name": "Ceramics: Handbuilding Basics",
+                "description": "Learn coil and slab techniques to create functional pottery. No experience needed. All materials and tools provided. Pieces will be fired and glazed — ready for pickup in 3 weeks. Wear clothes that can get dirty.",
+                "category": "workshops-and-classes",
+                "venue": "GoDown Arts Centre",
+                "location_tag": "nairobi",
+                "lat": -1.2699,
+                "lng": 36.8387,
+                "price": Decimal("28"),
+                "ticketing_enabled": True,
+                "available_tickets": 10,
+                "going_count": 8,
+                "event_type": "B",
+                "start_offset_hours": -168,  # Past event
                 "duration_hours": 4,
-                "more_details_url": "https://pursuit.app/demo",
+            },
+            {
+                "name": "Kiswahili for Beginners: 4-Week Course",
+                "description": "Conversational Kiswahili course. One 2-hour session per week for 4 weeks. Focused on practical phrases and interactions. Small class size, interactive exercises. Workbook provided. Classes fill fast with expats — locals welcome too.",
+                "category": "workshops-and-classes",
+                "venue": "Alliance Française",
+                "location_tag": "nairobi",
+                "lat": -1.2644,
+                "lng": 36.8078,
+                "price": Decimal("40"),
+                "ticketing_enabled": True,
+                "available_tickets": 12,
+                "going_count": 10,
+                "event_type": "B",
+                "start_offset_hours": 504,  # Week 3
+                "duration_hours": 8,
+            },
+            {
+                "name": "Nyege Nyege Nairobi: Electronic Music Night",
+                "description": "East Africa's premier electronic music festival brings its Nairobi edition. Four stages, 30+ DJs, experimental beats from Kampala to Kinshasa. 18+ only, ID required. Upper deck at main stage is less crowded with better ventilation.",
+                "category": "concerts-and-nightlife",
+                "venue": "Ngong Racecourse",
+                "location_tag": "nairobi",
+                "lat": -1.3062,
+                "lng": 36.7586,
+                "price": Decimal("35"),
+                "ticketing_enabled": True,
+                "available_tickets": 280,
+                "going_count": 412,
+                "event_type": "B",
+                "start_offset_hours": -336,  # Past event
+                "duration_hours": 10,
+            },
+            {
+                "name": "Nairobi Coffee Crawl",
+                "description": "Guided walking tour visiting 5 of Nairobi's best specialty coffee roasters. Learn about Kenyan coffee production, cupping techniques, and brewing methods. Includes tastings at each stop. Wear comfortable shoes — 3km of walking.",
+                "category": "food-and-drink",
+                "venue": "Nairobi CBD",
+                "location_tag": "nairobi",
+                "lat": -1.2864,
+                "lng": 36.8172,
+                "price": Decimal("25"),
+                "ticketing_enabled": True,
+                "available_tickets": 15,
+                "going_count": 12,
+                "event_type": "B",
+                "start_offset_hours": 672,  # Week 4
+                "duration_hours": 3,
+            },
+            {
+                "name": "Bread Making Workshop: Sourdough & Artisan Loaves",
+                "description": "Full-day workshop learning to make sourdough starter and bake artisan bread. Hands-on throughout. Each participant bakes 2 loaves to take home. Lunch included. Held at a working bakery — you'll leave smelling like fresh bread.",
+                "category": "workshops-and-classes",
+                "venue": "Spring Valley Bakery",
+                "location_tag": "nairobi",
+                "lat": -1.2642,
+                "lng": 36.7886,
+                "price": Decimal("35"),
+                "ticketing_enabled": True,
+                "available_tickets": 8,
+                "going_count": 7,
+                "event_type": "B",
+                "start_offset_hours": -504,  # Past event
+                "duration_hours": 6,
+            },
+            {
+                "name": "Vegan Brunch Pop-Up at Spring Valley",
+                "description": "Plant-based brunch featuring innovative takes on Kenyan classics. Ugali made from purple sweet potato, coconut-based nyama choma substitute, passion fruit mimosas. Outdoor garden seating. Limited capacity, no walk-ins.",
+                "category": "food-and-drink",
+                "venue": "Spring Valley Community Market",
+                "location_tag": "nairobi",
+                "lat": -1.2642,
+                "lng": 36.7886,
+                "price": Decimal("18"),
+                "ticketing_enabled": True,
+                "available_tickets": 40,
+                "going_count": 31,
+                "event_type": "B",
+                "start_offset_hours": 840,  # Week 5
+                "duration_hours": 3,
+            },
+            {
+                "name": "Digital Marketing for Small Business",
+                "description": "Half-day intensive covering social media strategy, content creation, and analytics. Bring your laptop. Case studies from Kenyan businesses. Coffee and lunch included. Instructor worked at Safaricom for 10 years — practical over theory.",
+                "category": "workshops-and-classes",
+                "venue": "PAWA254",
+                "location_tag": "nairobi",
+                "lat": -1.3152,
+                "lng": 36.8322,
+                "price": Decimal("25"),
+                "ticketing_enabled": True,
+                "available_tickets": 25,
+                "going_count": 19,
+                "event_type": "B",
+                "start_offset_hours": -672,  # Past event
+                "duration_hours": 4,
+            },
+            {
+                "name": "Poetry Slam: Spoken Word Showcase",
+                "description": "Open mic poetry night with featured performers from Nairobi's slam poetry scene. Sign up to perform or just enjoy the show. Cash bar and light snacks. The basement venue at PAWA has incredible acoustics — no mic needed for the intimate crowd.",
+                "category": "culture-and-arts",
+                "venue": "PAWA254",
+                "location_tag": "nairobi",
+                "lat": -1.3152,
+                "lng": 36.8322,
+                "price": Decimal("5"),
+                "ticketing_enabled": True,
+                "available_tickets": 60,
+                "going_count": 42,
+                "event_type": "B",
+                "start_offset_hours": 1008,  # Week 6
+                "duration_hours": 3,
+            },
+            {
+                "name": "Beading & Jewelry Making Class",
+                "description": "Learn traditional Maasai beading techniques and create your own jewelry piece to take home. All materials provided. Taught by artisans from the Maasai Market collective. Small class size for personalized instruction. Bring reading glasses if needed — detailed work.",
+                "category": "culture-and-arts",
+                "venue": "The Hub Karen",
+                "location_tag": "nairobi",
+                "lat": -1.3218,
+                "lng": 36.7073,
+                "price": Decimal("25"),
+                "ticketing_enabled": True,
+                "available_tickets": 12,
+                "going_count": 9,
+                "event_type": "B",
+                "start_offset_hours": -840,  # Past event
+                "duration_hours": 3,
+            },
+
+            # TYPE C: External, Free — 10 events
+            {
+                "name": "Contemporary Kenyan Art Exhibition Opening",
+                "description": "Month-long exhibition featuring 15 emerging Kenyan visual artists. Paintings, sculpture, mixed media exploring themes of identity, urbanization, and climate. Opening reception this Friday with artist talks. Free entry throughout the month.",
+                "category": "culture-and-arts",
+                "venue": "Circle Art Gallery",
+                "location_tag": "nairobi",
+                "lat": -1.2836,
+                "lng": 36.7661,
+                "price": Decimal("0"),
+                "ticketing_enabled": False,
+                "available_tickets": None,
+                "going_count": 142,
+                "event_type": "C",
+                "start_offset_hours": 5,  # Tonight
+                "duration_hours": 720,  # 30 days
+                "more_details_url": "https://www.circleartgallery.com/exhibitions",
+            },
+            {
+                "name": "Climate Action Panel Discussion",
+                "description": "Environmental scientists, policymakers, and activists discuss climate adaptation strategies for Kenya. Moderated Q&A follows. Light refreshments served. Hosted by Nairobi National Museum. Free but RSVP required via museum website.",
+                "category": "talks-and-ideas",
+                "venue": "Nairobi National Museum",
+                "location_tag": "nairobi",
+                "lat": -1.2687,
+                "lng": 36.8143,
+                "price": Decimal("0"),
+                "ticketing_enabled": False,
+                "available_tickets": None,
+                "going_count": 87,
+                "event_type": "C",
+                "start_offset_hours": -168,  # Past event
+                "duration_hours": 2,
+                "more_details_url": "https://www.museums.or.ke/events",
+            },
+            {
+                "name": "Reggae Sundays at Carnivore",
+                "description": "Open-air reggae session with DJ Fully Focus and live drum circle. Nyama choma and cocktails available for purchase. Free entry, pay-as-you-eat. Bring cash — M-Pesa at the bar has been unreliable lately. Family-friendly atmosphere.",
+                "category": "concerts-and-nightlife",
+                "venue": "Carnivore Restaurant",
+                "location_tag": "nairobi",
+                "lat": -1.3297,
+                "lng": 36.8092,
+                "price": Decimal("0"),
+                "ticketing_enabled": False,
+                "available_tickets": None,
+                "going_count": 134,
+                "event_type": "C",
+                "start_offset_hours": 96,  # This weekend
+                "duration_hours": 6,
+                "series_name": "Reggae Sundays",
+                "more_details_url": "https://tamarind.co.ke/carnivore/events",
+            },
+            {
+                "name": "Tech Startup Pitch Night",
+                "description": "Watch 8 Kenyan startups pitch their ideas to a panel of investors. Followed by networking session with founders, VCs, and the tech community. Free entry, drink minimum KES 500. Bring business cards — networking after is where the real deals happen.",
+                "category": "talks-and-ideas",
+                "venue": "PAWA254",
+                "location_tag": "nairobi",
+                "lat": -1.3152,
+                "lng": 36.8322,
+                "price": Decimal("0"),
+                "ticketing_enabled": False,
+                "available_tickets": None,
+                "going_count": 98,
+                "event_type": "C",
+                "start_offset_hours": 240,  # Week 2
+                "duration_hours": 3,
+                "more_details_url": "https://pawa254.org/events",
             },
             {
                 "name": "Vintage Fashion & Vinyl Records Popup",
-                "description": "Curated vintage clothing and record sale. 10 vendors with 60s-90s fashion and rare East African vinyl. Try-on mirrors available. Cash and M-Pesa. DJ spinning records all day. The upstairs section has the best clothing picks — less picked over than the ground floor.",
+                "description": "Curated vintage clothing and record sale. 10 vendors with 60s-90s fashion and rare East African vinyl. Try-on mirrors available. Cash and M-Pesa. DJ spinning records all day. Upstairs section has the best clothing picks — less picked over.",
                 "category": "markets-and-popups",
                 "venue": "Alchemist Bar",
-                "neighbourhood": "Westlands",
                 "location_tag": "nairobi",
                 "lat": -1.2673,
                 "lng": 36.8073,
@@ -861,94 +828,270 @@ class Command(BaseCommand):
                 "ticketing_enabled": False,
                 "available_tickets": None,
                 "going_count": 87,
-                "start_offset_hours": 168,  # Next week
+                "event_type": "C",
+                "start_offset_hours": -336,  # Past event
                 "duration_hours": 6,
                 "more_details_url": "https://alchemistbar.co.ke/events",
             },
             {
-                "name": "Holiday Gift Bazaar",
-                "description": "Two-day shopping event with 60+ local artisans and makers. Jewelry, home decor, skincare, gourmet foods, children's items. Gift wrapping available. Live entertainment. Parking can be a nightmare — consider an Uber or arrive before 11am.",
-                "category": "markets-and-popups",
-                "venue": "The Hub Karen",
-                "neighbourhood": "Karen",
+                "name": "Nairobi Film Festival Free Screening",
+                "description": "Free outdoor screening of award-winning Kenyan documentary. Part of Nairobi Film Festival week. Bring a mat or chair. Popcorn and drinks for sale. Q&A with filmmakers after the screening. Gates open at 6pm, film starts at 7pm.",
+                "category": "culture-and-arts",
+                "venue": "Alliance Française Courtyard",
                 "location_tag": "nairobi",
-                "lat": -1.3218,
-                "lng": 36.7073,
-                "price": Decimal("200"),
-                "ticketing_enabled": True,
-                "available_tickets": 500,
-                "going_count": 342,
-                "start_offset_hours": 504,  # Week 3
-                "duration_hours": 16,
+                "lat": -1.2644,
+                "lng": 36.8078,
+                "price": Decimal("0"),
+                "ticketing_enabled": False,
+                "available_tickets": None,
+                "going_count": 156,
+                "event_type": "C",
+                "start_offset_hours": 336,  # Week 2
+                "duration_hours": 3,
+                "more_details_url": "https://www.alliance-francaise.or.ke/film-festival",
             },
-            # TRAVEL (4 events)
+            {
+                "name": "Outdoor Yoga & Meditation at Arboretum",
+                "description": "Free morning yoga and meditation session in the serene Nairobi Arboretum. All levels welcome. Bring your own mat. Guided by certified instructor. Optional coffee and light snacks available for purchase after class. Arrive 10 min early for best shaded spot.",
+                "category": "outdoors-and-active",
+                "venue": "Nairobi Arboretum",
+                "location_tag": "nairobi",
+                "lat": -1.2820,
+                "lng": 36.8084,
+                "price": Decimal("0"),
+                "ticketing_enabled": False,
+                "available_tickets": None,
+                "going_count": 64,
+                "event_type": "C",
+                "start_offset_hours": -504,  # Past event
+                "duration_hours": 2,
+                "more_details_url": "https://nairobiforestconservancy.org/events",
+            },
+            {
+                "name": "Sunday Brunch Live Music at Brew Bistro",
+                "description": "Free live acoustic music every Sunday during brunch service. Full brunch menu available for purchase. Reservations recommended for tables. Walk-ins welcome at the bar. Music starts at noon. Great vibes, good food, no cover charge.",
+                "category": "food-and-drink",
+                "venue": "Brew Bistro Westlands",
+                "location_tag": "nairobi",
+                "lat": -1.2650,
+                "lng": 36.8100,
+                "price": Decimal("0"),
+                "ticketing_enabled": False,
+                "available_tickets": None,
+                "going_count": 89,
+                "event_type": "C",
+                "start_offset_hours": 504,  # Week 3
+                "duration_hours": 4,
+                "series_name": "Sunday Brunch Sessions",
+                "more_details_url": "https://brewbistro.co.ke/events",
+            },
+            {
+                "name": "Nairobi Design Week Open Studios",
+                "description": "Free access to local designers' studios during Nairobi Design Week. Meet fashion designers, graphic artists, and product designers. See works in progress and finished pieces. Self-guided studio tour across Kilimani and Lavington. Map provided.",
+                "category": "culture-and-arts",
+                "venue": "Multiple Studios",
+                "location_tag": "nairobi",
+                "lat": -1.2820,
+                "lng": 36.7750,
+                "price": Decimal("0"),
+                "ticketing_enabled": False,
+                "available_tickets": None,
+                "going_count": 73,
+                "event_type": "C",
+                "start_offset_hours": -672,  # Past event
+                "duration_hours": 8,
+                "more_details_url": "https://nairobidesignweek.com",
+            },
+            {
+                "name": "Community Garden Workshop",
+                "description": "Free hands-on workshop on urban farming and container gardening. Learn to grow vegetables in small spaces. Seedlings and planting tips provided. Hosted by Nairobi City County Urban Agriculture Program. Register online to confirm attendance.",
+                "category": "workshops-and-classes",
+                "venue": "City Park",
+                "location_tag": "nairobi",
+                "lat": -1.2657,
+                "lng": 36.8297,
+                "price": Decimal("0"),
+                "ticketing_enabled": False,
+                "available_tickets": None,
+                "going_count": 42,
+                "event_type": "C",
+                "start_offset_hours": 672,  # Week 4
+                "duration_hours": 3,
+                "more_details_url": "https://www.nairobi.go.ke/agriculture/events",
+            },
+
+            # TYPE D: External, Paid — 10 events
+            {
+                "name": "Nairobi International Film Festival",
+                "description": "Week-long showcase of African and international cinema. 40+ films across documentary, feature, and short categories. This year's focus: climate stories from the Global South. Opening night gala includes Q&A with filmmakers. Book tickets via festival website.",
+                "category": "culture-and-arts",
+                "venue": "Alliance Française",
+                "location_tag": "nairobi",
+                "lat": -1.2644,
+                "lng": 36.8078,
+                "price": Decimal("8"),
+                "ticketing_enabled": False,
+                "available_tickets": None,
+                "going_count": 178,
+                "event_type": "D",
+                "start_offset_hours": 336,  # Week 2
+                "duration_hours": 168,  # 7 days
+                "more_details_url": "https://www.alliance-francaise.or.ke/film-festival/tickets",
+                "has_gallery": True,
+                "gallery_description": "Film stills from this year's featured selections and behind-the-scenes photos from the festival setup.",
+            },
+            {
+                "name": "TEDx Nairobi: Ideas Worth Spreading",
+                "description": "Full-day conference featuring 12 speakers on innovation, culture, and social change. Networking breaks, lunch, and evening reception included. Past speakers include Lupita Nyong'o and Juliani. Early bird pricing ends 2 weeks before event. Tickets via TEDx website.",
+                "category": "talks-and-ideas",
+                "venue": "Sarit Centre",
+                "location_tag": "nairobi",
+                "lat": -1.2617,
+                "lng": 36.7910,
+                "price": Decimal("50"),
+                "ticketing_enabled": False,
+                "available_tickets": None,
+                "going_count": 245,
+                "event_type": "D",
+                "start_offset_hours": 840,  # Week 5
+                "duration_hours": 8,
+                "more_details_url": "https://tedxnairobi.com/tickets",
+            },
+            {
+                "name": "Kiswahili Theatre: Machozi ya Maendeleo",
+                "description": "Original play performed in Kiswahili exploring gentrification and displacement in Nairobi's eastlands. Powerful ensemble cast. English subtitles projected. Two-act play with intermission. Tickets available at Kenya National Theatre box office or online.",
+                "category": "culture-and-arts",
+                "venue": "Kenya National Theatre",
+                "location_tag": "nairobi",
+                "lat": -1.2781,
+                "lng": 36.8210,
+                "price": Decimal("10"),
+                "ticketing_enabled": False,
+                "available_tickets": None,
+                "going_count": 89,
+                "event_type": "D",
+                "start_offset_hours": -240,  # Past event
+                "duration_hours": 3,
+                "more_details_url": "https://kenyatheatre.or.ke/bookings",
+            },
+            {
+                "name": "Nairobi Restaurant Week",
+                "description": "Two-week dining festival featuring prix-fixe menus at 50+ Nairobi restaurants. 2-course lunch menus and 3-course dinner menus at special pricing. Reservations required — book directly with restaurants. Full participating list on festival website.",
+                "category": "food-and-drink",
+                "venue": "Various Restaurants",
+                "location_tag": "nairobi",
+                "lat": -1.2821,
+                "lng": 36.8219,
+                "price": Decimal("20"),
+                "ticketing_enabled": False,
+                "available_tickets": None,
+                "going_count": 312,
+                "event_type": "D",
+                "start_offset_hours": 168,  # Next week
+                "duration_hours": 336,  # 14 days
+                "more_details_url": "https://nairobirestaurantweek.com",
+            },
+            {
+                "name": "Jazz Fusion Concert: Nairobi Horns Project",
+                "description": "The legendary Nairobi Horns Project performs an evening of Afro-jazz fusion. Expect improvisation, call-and-response, and infectious rhythms. Seated venue, limited standing room. Cash bar, no food service. Rare Nairobi appearance — tickets via Ticketsasa.",
+                "category": "concerts-and-nightlife",
+                "venue": "Alliance Française",
+                "location_tag": "nairobi",
+                "lat": -1.2644,
+                "lng": 36.8078,
+                "price": Decimal("15"),
+                "ticketing_enabled": False,
+                "available_tickets": None,
+                "going_count": 71,
+                "event_type": "D",
+                "start_offset_hours": -336,  # Past event
+                "duration_hours": 3,
+                "more_details_url": "https://www.ticketsasa.com/events",
+            },
             {
                 "name": "Lamu Cultural Heritage Weekend",
-                "description": "3-day guided tour of Lamu Old Town — UNESCO World Heritage Site. Includes dhow sailing, Swahili cooking class, spice market visit, and historical walking tour. Accommodation and most meals included. Book flights separately. November to March is the best weather — less humid than summer.",
+                "description": "3-day guided tour of Lamu Old Town — UNESCO World Heritage Site. Includes dhow sailing, Swahili cooking class, spice market visit, and historical walking tour. Accommodation and most meals included. Book flights separately. Tickets via tour operator website.",
                 "category": "travel",
                 "venue": "Lamu Old Town",
-                "neighbourhood": "Lamu",
                 "location_tag": "mombasa",
                 "lat": -2.2717,
                 "lng": 40.9020,
-                "price": Decimal("18000"),
-                "ticketing_enabled": True,
-                "available_tickets": 12,
+                "price": Decimal("50"),
+                "ticketing_enabled": False,
+                "available_tickets": None,
                 "going_count": 9,
+                "event_type": "D",
                 "start_offset_hours": 672,  # Week 4
                 "duration_hours": 72,
+                "more_details_url": "https://lamuheritage.tours/book",
             },
             {
-                "name": "Diani Beach Yoga Retreat",
-                "description": "5-day wellness retreat on Diani Beach. Daily yoga, meditation, healthy meals, and spa treatments. Optional activities: snorkeling, stand-up paddleboarding, dhow sunset cruise. Airport transfers from Ukunda included. Shared and private room options.",
-                "category": "travel",
-                "venue": "Diani Beach",
-                "neighbourhood": "Diani",
-                "location_tag": "mombasa",
-                "lat": -4.2894,
-                "lng": 39.5788,
-                "price": Decimal("35000"),
-                "ticketing_enabled": True,
-                "available_tickets": 8,
-                "going_count": 6,
-                "start_offset_hours": 1008,  # Week 6
-                "duration_hours": 120,
-                "has_gallery": True,
-                "gallery_description": "Photos of the beachfront yoga pavilion, accommodation options, and previous retreat activities. Includes shots of the spa, dining area, and beach at sunset.",
+                "name": "Craft Beer Tasting: East African Breweries",
+                "description": "Sample 8 craft beers from Kenya, Tanzania, and Uganda. Meet the brewers, learn the stories behind each brew. Light bites included. Held at Brew Bistro's outdoor terrace. Generous pours. Purchase tickets online or at the door (subject to availability).",
+                "category": "food-and-drink",
+                "venue": "Brew Bistro",
+                "location_tag": "nairobi",
+                "lat": -1.2650,
+                "lng": 36.8100,
+                "price": Decimal("20"),
+                "ticketing_enabled": False,
+                "available_tickets": None,
+                "going_count": 28,
+                "event_type": "D",
+                "start_offset_hours": 504,  # Week 3
+                "duration_hours": 3,
+                "more_details_url": "https://brewbistro.co.ke/tastings",
+            },
+            {
+                "name": "Photography Workshop: Street Photography Nairobi",
+                "description": "Half-day workshop covering street photography techniques. Morning classroom session followed by guided walk through Nairobi streets. Bring your camera (phone cameras welcome). Lunch included. Instructor is a Magnum photographer. Book via workshop website.",
+                "category": "talks-and-ideas",
+                "venue": "GoDown Arts Centre",
+                "location_tag": "nairobi",
+                "lat": -1.2699,
+                "lng": 36.8387,
+                "price": Decimal("35"),
+                "ticketing_enabled": False,
+                "available_tickets": None,
+                "going_count": 12,
+                "event_type": "D",
+                "start_offset_hours": -504,  # Past event
+                "duration_hours": 5,
+                "more_details_url": "https://nairobiworkshops.com/photography",
+            },
+            {
+                "name": "Holiday Gift Bazaar",
+                "description": "Two-day shopping event with 60+ local artisans and makers. Jewelry, home decor, skincare, gourmet foods, children's items. Gift wrapping available. Live entertainment. KES 200 entry supports participating artisans. Tickets at the door or online.",
+                "category": "markets-and-popups",
+                "venue": "The Hub Karen",
+                "location_tag": "nairobi",
+                "lat": -1.3218,
+                "lng": 36.7073,
+                "price": Decimal("2"),
+                "ticketing_enabled": False,
+                "available_tickets": None,
+                "going_count": 342,
+                "event_type": "D",
+                "start_offset_hours": -840,  # Past event
+                "duration_hours": 16,
+                "more_details_url": "https://thehubkaren.com/bazaar",
             },
             {
                 "name": "Mt. Kenya Climbing Expedition: Sirimon Route",
-                "description": "5-day trek to Point Lenana (4,985m), Mt. Kenya's third-highest peak. All camping gear, porters, and meals included. Experienced mountain guide. Moderate to challenging fitness required. Acclimatization built into the itinerary — but altitude sickness is still possible, know the signs.",
+                "description": "5-day trek to Point Lenana (4,985m), Mt. Kenya's third-highest peak. All camping gear, porters, and meals included. Experienced mountain guide. Moderate to challenging fitness required. Acclimatization built in. Book via adventure tour operator.",
                 "category": "travel",
                 "venue": "Mt. Kenya National Park",
-                "neighbourhood": "Nanyuki",
                 "location_tag": "nairobi",
                 "lat": -0.1521,
                 "lng": 37.3084,
-                "price": Decimal("42000"),
-                "ticketing_enabled": True,
-                "available_tickets": 6,
+                "price": Decimal("42"),
+                "ticketing_enabled": False,
+                "available_tickets": None,
                 "going_count": 5,
-                "start_offset_hours": 840,  # Week 5
-                "duration_hours": 120,
-            },
-            {
-                "name": "Maasai Mara Safari: Great Migration",
-                "description": "3-day safari focused on witnessing the Great Migration river crossings. Game drives morning and evening, luxury tented camp accommodation. All meals and park fees included. Nairobi pickup/drop-off. August and September are peak migration — book 6 months ahead.",
-                "category": "travel",
-                "venue": "Maasai Mara National Reserve",
-                "neighbourhood": "Mara",
-                "location_tag": "nairobi",
-                "lat": -1.5014,
-                "lng": 35.1440,
-                "price": Decimal("55000"),
-                "ticketing_enabled": True,
-                "available_tickets": 10,
-                "going_count": 8,
+                "event_type": "D",
                 "start_offset_hours": 1176,  # Week 7
-                "duration_hours": 72,
-                "has_gallery": True,
-                "gallery_description": "Safari photos from previous trips showing wildlife encounters, river crossings, and camp accommodations. Includes dawn and dusk shots of the Mara landscape.",
+                "duration_hours": 120,
+                "more_details_url": "https://mtkenya.adventures/sirimon-route",
             },
         ]
 
@@ -969,6 +1112,20 @@ class Command(BaseCommand):
             if data.get("has_gallery"):
                 gallery_images = fetch_unsplash_gallery_images(data["category"], 3)
                 gallery_description = data.get("gallery_description")
+
+            # Determine organizer based on event type
+            # All events (A, B, C, D) are attributed to internal organizers
+            # External events (C, D) have more_details_url but still have an organizer
+            organizer_index = hash(data["name"]) % len(organizers)
+            organizer = organizers[organizer_index]
+
+            # Determine event status based on timing
+            if data["start_offset_hours"] < 0:
+                # Past event
+                status = "ended"
+            else:
+                # Upcoming event
+                status = "live"
 
             # Create event
             event, created = Event.objects.update_or_create(
@@ -992,20 +1149,75 @@ class Command(BaseCommand):
                     "gallery_images": gallery_images,
                     "gallery_description": gallery_description,
                     "is_active": True,
-                },
+                    "status": status,
+                }
             )
             event.category.set([category])
             events.append(event)
 
         return events
 
+    def _seed_ticket_tiers(self, events):
+        """Create 2 ticket tiers for each Type B (internal paid) event"""
+        tiers_count = 0
+
+        for event in events:
+            # Only add tiers for paid internal events (ticketing_enabled=True)
+            if not event.ticketing_enabled:
+                continue
+
+            # Early Bird tier
+            tier1, _ = TicketTier.objects.get_or_create(
+                event=event,
+                name="Early Bird",
+                defaults={
+                    "description": "Limited early bird discount",
+                    "price": max(Decimal("1"), event.price * Decimal("0.8")),  # 20% off
+                    "capacity": 50,
+                    "available": 50,
+                    "is_active": True,
+                    "sort_order": 1,
+                }
+            )
+            tiers_count += 1
+
+            # General Admission tier
+            tier2, _ = TicketTier.objects.get_or_create(
+                event=event,
+                name="General Admission",
+                defaults={
+                    "description": "Standard entry ticket",
+                    "price": event.price,
+                    "capacity": 100,
+                    "available": 100,
+                    "is_active": True,
+                    "sort_order": 2,
+                }
+            )
+            tiers_count += 1
+
+        return tiers_count
+
     def _seed_user_interactions(self, events):
-        """Create diverse user interactions for varied recommendations"""
+        """
+        Create diverse user interactions for varied recommendations.
+        Going RSVPs only for Type A (free internal) and external events (Types C and D).
+        NO going RSVPs for Type B (paid internal with ticketing).
+        """
         users = list(User.objects.all())
 
         if not users:
             self.stdout.write(self.style.WARNING("No users found — skipping interaction seeding"))
             return 0
+
+        # Find faithcathy12@gmail.com
+        faith_user = next((u for u in users if u.email == "faithcathy12@gmail.com"), None)
+        other_users = [u for u in users if u.email != "faithcathy12@gmail.com"]
+
+        import random
+        random.seed(42)
+
+        interaction_count = 0
 
         # Create name to slug mapping
         name_to_slug = {
@@ -1019,27 +1231,41 @@ class Command(BaseCommand):
             "Travel": "travel",
         }
 
-        # Create different interest patterns per user
-        interaction_count = 0
+        # Separate past and upcoming events
+        past_events = [e for e in events if e.status == "ended"]
+        upcoming_events = [e for e in events if e.status == "live"]
 
-        for user in users:
-            # Each user saves 3-8 events based on different patterns
-            import random
+        # Faith gets the most interactions
+        if faith_user:
+            # Past events: 8-10 interactions (mix of saved and going)
+            faith_past_sample = random.sample(past_events, min(10, len(past_events)))
+            for event in faith_past_sample:
+                # Save the event
+                UserEvents.objects.get_or_create(user=faith_user, event=event)
+                interaction_count += 1
 
-            random.seed(str(user.id))  # Deterministic but varied per user
+                # Going only for Type A and external events (not Type B paid ticketed)
+                if not event.ticketing_enabled or event.more_details_url:
+                    EventGoing.objects.get_or_create(user=faith_user, event=event)
+                    interaction_count += 1
 
+            # Upcoming events: 3-5 interactions (mix of saved and going)
+            faith_upcoming_sample = random.sample(upcoming_events, min(5, len(upcoming_events)))
+            for event in faith_upcoming_sample:
+                # Save the event
+                UserEvents.objects.get_or_create(user=faith_user, event=event)
+                interaction_count += 1
+
+                # Going only for Type A and external events
+                if not event.ticketing_enabled or event.more_details_url:
+                    EventGoing.objects.get_or_create(user=faith_user, event=event)
+                    interaction_count += 1
+
+        # Other users get varied interactions
+        for user in other_users:
             # Random interest pattern
             interest_categories = random.sample(
-                [
-                    "concerts-and-nightlife",
-                    "outdoors-and-active",
-                    "food-and-drink",
-                    "culture-and-arts",
-                    "talks-and-ideas",
-                    "workshops-and-classes",
-                    "markets-and-popups",
-                    "travel",
-                ],
+                list(name_to_slug.values()),
                 k=random.randint(2, 4),
             )
 
@@ -1050,16 +1276,18 @@ class Command(BaseCommand):
                 if e.category.first() and name_to_slug.get(e.category.first().name) in interest_categories
             ]
 
-            # Save 3-8 random events from their interest categories
-            events_to_save = random.sample(interested_events, min(random.randint(3, 8), len(interested_events)))
+            # Save 2-5 random events from their interest categories
+            events_to_interact = random.sample(interested_events, min(random.randint(2, 5), len(interested_events)))
 
-            for event in events_to_save:
+            for event in events_to_interact:
+                # Always save
                 UserEvents.objects.get_or_create(user=user, event=event)
                 interaction_count += 1
 
-                # Update going_count on the event
-                event.going_count += 1
-                event.save(update_fields=["going_count"])
+                # Going only for Type A and external events (50% chance)
+                if (not event.ticketing_enabled or event.more_details_url) and random.random() < 0.5:
+                    EventGoing.objects.get_or_create(user=user, event=event)
+                    interaction_count += 1
 
         return interaction_count
 
@@ -1068,31 +1296,32 @@ class Command(BaseCommand):
         now = timezone.now()
 
         # Select strong events with good descriptions for editor's picks
-        concerts_events = [e for e in events if e.category.first() and e.category.first().name == "Concerts & Nightlife"]
-        culture_events = [e for e in events if e.category.first() and e.category.first().name == "Culture & Arts"]
-        food_events = [e for e in events if e.category.first() and e.category.first().name == "Food & Drink"]
+        upcoming_events = [e for e in events if e.status == "live"]
+        concerts_events = [e for e in upcoming_events if e.category.first() and e.category.first().name == "Concerts & Nightlife"]
+        culture_events = [e for e in upcoming_events if e.category.first() and e.category.first().name == "Culture & Arts"]
+        food_events = [e for e in upcoming_events if e.category.first() and e.category.first().name == "Food & Drink"]
 
         picks_data = [
             {
-                "event": concerts_events[0] if concerts_events else events[0],
+                "event": concerts_events[0] if concerts_events else upcoming_events[0],
                 "location_tag": "nairobi",
                 "active_from": now,
                 "active_until": now + timedelta(days=7),
-                "curator_note": "Nairobi's most iconic outdoor music festival. The vibe is unmatched — arrive early for the best lawn spots.",
+                "curator_note": "Nairobi's most iconic outdoor music festival. The vibe is unmatched — arrive early for the best lawn spots and pack sunscreen.",
                 "curator_name": "Kamau, Pursuit",
                 "position": 1,
             },
             {
-                "event": culture_events[0] if culture_events else events[1],
+                "event": culture_events[0] if culture_events else upcoming_events[1],
                 "location_tag": "nairobi",
                 "active_from": now + timedelta(days=7),
                 "active_until": now + timedelta(days=14),
-                "curator_note": "A must-see exhibition showcasing Kenya's emerging art scene. The opening reception is always electric.",
+                "curator_note": "A must-see exhibition showcasing Kenya's emerging art scene. The opening reception is always electric with great conversation.",
                 "curator_name": "Pursuit team",
                 "position": 1,
             },
             {
-                "event": food_events[0] if food_events else events[2],
+                "event": food_events[0] if food_events else upcoming_events[2],
                 "location_tag": "mombasa",
                 "active_from": now,
                 "active_until": now + timedelta(days=7),
@@ -1104,83 +1333,81 @@ class Command(BaseCommand):
 
         picks_count = 0
         for pick_data in picks_data:
-            EditorsPick.objects.update_or_create(
-                event=pick_data["event"],
-                location_tag=pick_data["location_tag"],
-                active_from=pick_data["active_from"],
-                defaults={
-                    "active_until": pick_data["active_until"],
-                    "curator_note": pick_data["curator_note"],
-                    "curator_name": pick_data["curator_name"],
-                    "position": pick_data["position"],
-                },
-            )
-            picks_count += 1
+            if pick_data["event"]:
+                EditorsPick.objects.update_or_create(
+                    event=pick_data["event"],
+                    location_tag=pick_data["location_tag"],
+                    active_from=pick_data["active_from"],
+                    defaults={
+                        "active_until": pick_data["active_until"],
+                        "curator_note": pick_data["curator_note"],
+                        "curator_name": pick_data["curator_name"],
+                        "position": pick_data["position"],
+                    },
+                )
+                picks_count += 1
 
         return picks_count
 
-    def _seed_trips(self, events):
-        """Create trips for some users with associated events"""
-        users = list(User.objects.all())
-
-        if not users:
-            return 0
-
-        import random
-
-        now = timezone.now()
-        # Get travel events for trips
-        travel_events = [e for e in events if e.category.first() and e.category.first().name == "Travel"]
-
-        trips_data = [
-            {
-                "name": "Coastal Getaway: Lamu & Diani",
-                "destination": "Lamu & Diani Beach",
-                "start_date": now + timedelta(days=21),
-                "end_date": now + timedelta(days=28),
-                "image": "https://images.unsplash.com/photo-1559827260-dc66d52bef19",
-            },
-            {
-                "name": "Mt. Kenya Adventure",
-                "destination": "Mt. Kenya & Nanyuki",
-                "start_date": now + timedelta(days=28),
-                "end_date": now + timedelta(days=33),
-                "image": "https://images.unsplash.com/photo-1589553416260-f586c8f1514f",
-            },
-            {
-                "name": "Maasai Mara Safari",
-                "destination": "Maasai Mara",
-                "start_date": now + timedelta(days=14),
-                "end_date": now + timedelta(days=17),
-                "image": "https://images.unsplash.com/photo-1516426122078-c23e76319801",
-            },
-        ]
-
-        trips_count = 0
-
-        # Assign trips to different users
-        for idx, trip_data in enumerate(trips_data):
-            if idx >= len(users):
-                break
-
-            user = users[idx]
-
-            trip, created = Trip.objects.update_or_create(
-                user=user,
-                name=trip_data["name"],
-                defaults={
-                    "destination": trip_data["destination"],
-                    "start_date": trip_data["start_date"],
-                    "end_date": trip_data["end_date"],
-                    "image": trip_data["image"],
-                },
-            )
-
-            # Add 1-2 travel events to each trip
-            trip_events = random.sample(travel_events, min(2, len(travel_events)))
-            for event in trip_events:
-                trip.events.add(event)
-
-            trips_count += 1
-
-        return trips_count
+    # Trips feature temporarily removed — seed commented out
+    # TODO: re-enable when trips feature is restored
+    #
+    # def _seed_trips(self, events):
+    #     """Create trips for some users with associated events"""
+    #     users = list(User.objects.all())
+    #
+    #     if not users:
+    #         return 0
+    #
+    #     import random
+    #     random.seed(42)
+    #
+    #     now = timezone.now()
+    #     # Get travel events for trips
+    #     travel_events = [e for e in events if e.category.first() and e.category.first().name == "Travel"]
+    #
+    #     trips_data = [
+    #         {
+    #             "name": "Coastal Getaway: Lamu & Diani",
+    #             "destination": "Lamu & Diani Beach",
+    #             "start_date": now + timedelta(days=21),
+    #             "end_date": now + timedelta(days=28),
+    #             "image": "https://images.unsplash.com/photo-1559827260-dc66d52bef19",
+    #         },
+    #         {
+    #             "name": "Mt. Kenya Adventure",
+    #             "destination": "Mt. Kenya & Nanyuki",
+    #             "start_date": now + timedelta(days=28),
+    #             "end_date": now + timedelta(days=33),
+    #             "image": "https://images.unsplash.com/photo-1589553416260-f586c8f1514f",
+    #         },
+    #     ]
+    #
+    #     trips_count = 0
+    #
+    #     # Assign trips to different users
+    #     for idx, trip_data in enumerate(trips_data):
+    #         if idx >= len(users):
+    #             break
+    #
+    #         user = users[idx]
+    #
+    #         trip, created = Trip.objects.update_or_create(
+    #             user=user,
+    #             name=trip_data["name"],
+    #             defaults={
+    #                 "destination": trip_data["destination"],
+    #                 "start_date": trip_data["start_date"],
+    #                 "end_date": trip_data["end_date"],
+    #                 "image": trip_data["image"],
+    #             }
+    #         )
+    #
+    #         # Add 1-2 travel events to each trip
+    #         trip_events = random.sample(travel_events, min(2, len(travel_events)))
+    #         for event in trip_events:
+    #             trip.events.add(event)
+    #
+    #         trips_count += 1
+    #
+    #     return trips_count

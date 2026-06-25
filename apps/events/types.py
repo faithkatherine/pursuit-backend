@@ -4,6 +4,15 @@ from graphene_django import DjangoObjectType
 from .models import Event, TicketTier
 
 
+class UserTicketType(graphene.ObjectType):
+    """User's ticket information for an event"""
+    order_id = graphene.ID(required=True)
+    ticket_count = graphene.Int(required=True)
+    total_paid = graphene.String(required=True)
+    tier_name = graphene.String()
+    purchase_date = graphene.DateTime(required=True)
+
+
 class TicketTierType(DjangoObjectType):
     """Ticket tier GraphQL type"""
 
@@ -29,6 +38,9 @@ class EventType(DjangoObjectType):
     is_going = graphene.Boolean()
     is_editors_pick = graphene.Boolean()
     has_confirmed_ticket = graphene.Boolean()
+    user_ticket = graphene.Field(UserTicketType)
+    is_external = graphene.Boolean()
+    is_internal = graphene.Boolean()
     reason = graphene.String()
     source = graphene.String()
     curator_note = graphene.String()
@@ -113,3 +125,49 @@ class EventType(DjangoObjectType):
     def resolve_ticket_tiers(self, info):
         """Return active ticket tiers for this event, ordered by sort_order and price"""
         return self.ticket_tiers.filter(is_active=True)
+
+    def resolve_user_ticket(self, info):
+        """Return user's ticket info if they have purchased a ticket for this event"""
+        user = info.context.user
+        if not user.is_authenticated:
+            return None
+
+        # Use cached ticket info if available (set by resolver)
+        if hasattr(self, "_user_ticket_info"):
+            return self._user_ticket_info
+
+        # Fallback: query for user's paid order for this event
+        from apps.payments.models import Order
+
+        order = Order.objects.filter(
+            user=user,
+            event=self,
+            status='paid'
+        ).select_related('mpesa_transaction').prefetch_related('items__tickets').first()
+
+        if not order:
+            return None
+
+        # Count total tickets across all order items
+        ticket_count = sum(item.tickets.count() for item in order.items.all())
+
+        # Get primary tier name (from first order item)
+        tier_name = None
+        if order.items.exists():
+            tier_name = order.items.first().tier.name
+
+        return UserTicketType(
+            order_id=str(order.id),
+            ticket_count=ticket_count,
+            total_paid=str(order.total),
+            tier_name=tier_name,
+            purchase_date=order.paid_at or order.created_at
+        )
+
+    def resolve_is_external(self, info):
+        """Return True if event has external ticketing (more_details_url exists)"""
+        return bool(self.more_details_url)
+
+    def resolve_is_internal(self, info):
+        """Return True if event uses internal ticketing (no more_details_url)"""
+        return not bool(self.more_details_url)

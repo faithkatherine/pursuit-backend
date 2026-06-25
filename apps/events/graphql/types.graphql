@@ -1,6 +1,31 @@
 # GraphQL Types for Events
 
 """
+User's ticket information for an event
+"""
+type UserTicket {
+  orderId: ID!
+  ticketCount: Int!
+  totalPaid: String!
+  tierName: String
+  purchaseDate: DateTime!
+}
+
+"""
+A ticket tier with pricing information
+"""
+type TicketTier {
+  id: ID!
+  name: String!
+  description: String
+  price: String!
+  available: Int!
+  capacity: Int!
+  isActive: Boolean!
+  sortOrder: Int!
+}
+
+"""
 An event with location, date, and category information
 """
 type Event {
@@ -15,11 +40,38 @@ type Event {
   locationName: String
   coordinates: [Float]
   moreDetailsUrl: String
+  price: String!
+  ticketingEnabled: Boolean!
+  availableTickets: Int
+  goingCount: Int!
+  hasGallery: Boolean!
+  galleryImages: [String]
+  galleryDescription: String
+  seriesName: String
   createdAt: DateTime!
   updatedAt: DateTime!
   isActive: Boolean!
   isFree: Boolean!
+
+  # User-specific fields
   isSaved: Boolean!
+  isGoing: Boolean!
+  hasConfirmedTicket: Boolean!
+  userTicket: UserTicket
+
+  # Computed fields
+  isExternal: Boolean!
+  isInternal: Boolean!
+
+  # Editor's Pick fields
+  isEditorsPick: Boolean!
+  curatorNote: String
+  curatorName: String
+  reason: String
+  source: String
+
+  # Relations
+  ticketTiers: [TicketTier!]
 }
 
 """
@@ -38,8 +90,33 @@ type EventPayload {
   event: Event
 }
 
-type SavedEventPayload {
+"""
+Response payload for save/unsave event mutations
+"""
+type SaveEventPayload {
   ok: Boolean!
   event: Event
-  errors: [String!]!
+  errors: [String!]
+}
+
+"""
+Response payload for going/ungoing event mutations
+"""
+type GoingEventPayload {
+  ok: Boolean!
+  event: Event
+  errors: [String!]
+}
+
+"""
+Category for organizing events
+"""
+type Category {
+  id: ID!
+  name: String!
+  icon: String
+  description: String
+  color: String!
+  isActive: Boolean!
+  sortOrder: Int!
 }
