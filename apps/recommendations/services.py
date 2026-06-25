@@ -8,11 +8,13 @@ Personalized event recommendation engine:
 """
 
 import logging
+from datetime import timedelta
 
 from django.core.cache import cache
-from django.db.models import Count
+from django.db.models import Count, OuterRef, Subquery
 from django.utils import timezone
 
+from apps.core.models import Category
 from apps.events.models import Event, EventGoing, UserEvents
 
 logger = logging.getLogger(__name__)
@@ -136,7 +138,6 @@ def get_recommended_events(
         )
 
         reason, source = _determine_reason(
-            event,
             event_category_ids,
             content_score,
             collab_score,
@@ -148,7 +149,7 @@ def get_recommended_events(
 
     scored.sort(key=lambda x: x[1], reverse=True)
 
-    results = [(event, reason, source) for event, _score, reason, source in scored[offset : offset + limit]]
+    results = [(event, reason, source) for event, score, reason, source in scored[offset : offset + limit]]
 
     # Backfill with popular events if we have fewer than target_count
     if len(results) < target_count:
@@ -166,8 +167,6 @@ def _get_collaborative_event_ids(user, saved_event_ids):
     Simple collaborative filtering on events: find users who saved the same
     events as this user, then get what else those users saved.
     """
-    from apps.events.models import UserEvents
-
     if not saved_event_ids:
         return set()
 
@@ -191,14 +190,12 @@ def _get_collaborative_event_ids(user, saved_event_ids):
     return collaborative_ids
 
 
-def _determine_reason(event, event_category_ids, content_score, collab_score, popularity_score, user_category_ids):
+def _determine_reason(event_category_ids, content_score, collab_score, popularity_score, user_category_ids):
     """Determine the human-readable reason and source type for a recommendation."""
     if content_score > 0:
         # Find the matching category name
         matching_ids = event_category_ids & user_category_ids
         if matching_ids:
-            from apps.core.models import Category
-
             cat = Category.objects.filter(id__in=matching_ids).first()
             if cat:
                 return (f"Based on your interest in {cat.name}", "content_based")
@@ -228,16 +225,11 @@ def get_trending_events(user, limit=5, date_from=None, date_to=None, exclude_eve
     if cached is not None:
         return cached
 
-    from datetime import timedelta
-    from django.db.models import Q
-
     now = timezone.now()
     trending_cutoff = now - timedelta(hours=TRENDING_WINDOW_HOURS)
 
     # Count recent interactions (saves + going) from ALL users in the last 72 hours
     # We use a subquery to count distinct users who interacted with each event
-    from django.db.models import Count, OuterRef, Subquery
-
     # Subquery: count unique users who saved OR went to each event in last 72 hours
     recent_saves = UserEvents.objects.filter(
         event_id=OuterRef('pk'),
