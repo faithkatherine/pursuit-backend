@@ -46,6 +46,7 @@ class EventType(DjangoObjectType):
     curator_note = graphene.String()
     curator_name = graphene.String()
     ticket_tiers = graphene.List(graphene.NonNull(TicketTierType))
+    user_status = graphene.String()
 
     class Meta:
         model = Event
@@ -72,6 +73,7 @@ class EventType(DjangoObjectType):
             "updated_at",
             "is_active",
             "is_free",
+            "status",
         )
 
     def resolve_is_saved(self, info):
@@ -171,3 +173,7 @@ class EventType(DjangoObjectType):
     def resolve_is_internal(self, info):
         """Return True if event uses internal ticketing (no more_details_url)"""
         return not bool(self.more_details_url)
+
+    def resolve_user_status(self, info):
+        """Return user's status for this event: 'WENT', 'SAVED', or None"""
+        return getattr(self, "_user_status", None)

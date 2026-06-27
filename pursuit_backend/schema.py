@@ -1,5 +1,6 @@
 import graphene
 
+from apps.core.schema import CoreQueries
 from apps.buckets.schema import BucketsMutations, BucketsQueries
 from apps.events.schema import EventsMutations, EventsQueries
 from apps.insights.schema import InsightsQueries
@@ -8,7 +9,7 @@ from apps.recommendations.schema import RecommendationsQueries
 from apps.users.schema import UserMutations, UserQueries
 
 
-class Query(BucketsQueries, RecommendationsQueries, InsightsQueries, EventsQueries, UserQueries, graphene.ObjectType):
+class Query(CoreQueries, BucketsQueries, RecommendationsQueries, InsightsQueries, EventsQueries, UserQueries, graphene.ObjectType):
     """Root Query combining all app queries"""
 
     # GraphQL requires at least one query field

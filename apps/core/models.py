@@ -20,6 +20,7 @@ class Category(TimeStampedModel):
     """Category model for organizing bucket items"""
 
     name = models.CharField(max_length=100, unique=True)
+    slug = models.SlugField(max_length=100, unique=True, help_text="URL-friendly slug (e.g., 'talks-and-ideas')")
     icon = models.CharField(max_length=10, blank=True)
     description = models.TextField(blank=True)
     color = models.CharField(max_length=7, default="#007AFF")  # Hex color
@@ -36,6 +37,12 @@ class Category(TimeStampedModel):
             models.Index(fields=["is_active"]),
             models.Index(fields=["sort_order"]),
         ]
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            from django.utils.text import slugify
+            self.slug = slugify(self.name)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.icon} {self.name}" if self.icon else self.name

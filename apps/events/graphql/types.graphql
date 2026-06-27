@@ -52,6 +52,7 @@ type Event {
   updatedAt: DateTime!
   isActive: Boolean!
   isFree: Boolean!
+  status: String!
 
   # User-specific fields
   isSaved: Boolean!
@@ -114,6 +115,7 @@ Category for organizing events
 type Category {
   id: ID!
   name: String!
+  slug: String!
   icon: String
   description: String
   color: String!

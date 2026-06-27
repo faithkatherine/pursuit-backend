@@ -99,6 +99,7 @@ class EventsListPayload(graphene.ObjectType):
 
     ok = graphene.Boolean(required=True)
     events = graphene.List(graphene.NonNull(EventType), required=True)
+    total_count = graphene.Int()
 
 
 class EventPayload(graphene.ObjectType):
@@ -359,26 +360,33 @@ class EventsQueries(graphene.ObjectType):
         return EventsListPayload(ok=True, events=events)
 
     def resolve_saved_events(self, info, offset=0, limit=20):
-        """Return the authenticated user's saved events, ordered by most recently saved."""
+        """Return the authenticated user's saved events (future only), ordered by most recently saved."""
         user = info.context.user
         if not user.is_authenticated:
             raise GraphQLError("Authentication required.")
 
         offset = max(0, offset)
         limit = max(1, min(limit, MAX_LIMIT))
+        now = timezone.now()
 
+        # Only return saved events with future dates
         qs = (
             _annotate_is_saved(
                 Event.objects.filter(
                     user_interactions__user=user,
                     is_active=True,
+                    date__gte=now,  # Future events only
                 ),
                 user,
             )
             .prefetch_related("category")
             .order_by("-user_interactions__created_at")
         )
-        return EventsListPayload(ok=True, events=list(qs[offset : offset + limit]))
+
+        total_count = qs.count()
+        events = list(qs[offset : offset + limit])
+
+        return EventsListPayload(ok=True, events=events, total_count=total_count)
 
     def resolve_upcoming_plans(self, info, offset=0, limit=20):
         """Return upcoming ticketed and going events for the authenticated user."""
@@ -421,16 +429,18 @@ class EventsQueries(graphene.ObjectType):
             .order_by("date")
         )
 
+        total_count = qs.count()
+
         # Mark which events have confirmed tickets
         ticketed_ids = set(ticketed_event_ids)
         events = list(qs[offset : offset + limit])
         for event in events:
             event._has_confirmed_ticket = event.pk in ticketed_ids
 
-        return EventsListPayload(ok=True, events=events)
+        return EventsListPayload(ok=True, events=events, total_count=total_count)
 
     def resolve_past_plans(self, info, offset=0, limit=20):
-        """Return past ticketed and going events for the authenticated user."""
+        """Return past ticketed, going, and saved events for the authenticated user."""
         user = info.context.user
         if not user.is_authenticated:
             raise GraphQLError("Authentication required.")
@@ -440,22 +450,29 @@ class EventsQueries(graphene.ObjectType):
         now = timezone.now()
 
         # Get event IDs from paid orders (ticketed events)
-        ticketed_event_ids = Order.objects.filter(
+        ticketed_event_ids = set(Order.objects.filter(
             user=user,
             status='paid',
             event__date__lt=now,
             event__is_active=True,
-        ).values_list('event_id', flat=True)
+        ).values_list('event_id', flat=True))
 
         # Get event IDs from going events
-        going_event_ids = EventGoing.objects.filter(
+        going_event_ids = set(EventGoing.objects.filter(
             user=user,
             event__date__lt=now,
             event__is_active=True,
-        ).values_list('event_id', flat=True)
+        ).values_list('event_id', flat=True))
 
-        # Combine and get unique event IDs
-        all_event_ids = set(ticketed_event_ids) | set(going_event_ids)
+        # Get event IDs from past saved events (date < now)
+        past_saved_event_ids = set(UserEvents.objects.filter(
+            user=user,
+            event__date__lt=now,
+            event__is_active=True,
+        ).values_list('event_id', flat=True))
+
+        # Combine all unique event IDs
+        all_event_ids = ticketed_event_ids | going_event_ids | past_saved_event_ids
 
         # Fetch events and annotate
         qs = (
@@ -470,13 +487,20 @@ class EventsQueries(graphene.ObjectType):
             .order_by("-date")  # Most recent first for past events
         )
 
-        # Mark which events have confirmed tickets
-        ticketed_ids = set(ticketed_event_ids)
+        total_count = qs.count()
         events = list(qs[offset : offset + limit])
-        for event in events:
-            event._has_confirmed_ticket = event.pk in ticketed_ids
 
-        return EventsListPayload(ok=True, events=events)
+        # Mark user status: WENT takes precedence over SAVED
+        for event in events:
+            event._has_confirmed_ticket = event.pk in ticketed_event_ids
+
+            # Determine userStatus: 'WENT' if attended/ticketed, 'SAVED' if only saved
+            if event.pk in ticketed_event_ids or event.pk in going_event_ids:
+                event._user_status = 'WENT'
+            elif event.pk in past_saved_event_ids:
+                event._user_status = 'SAVED'
+
+        return EventsListPayload(ok=True, events=events, total_count=total_count)
 
     def resolve_event(self, info, id):
         """Return a single active event by ID. Raises GraphQLError if not found or inactive."""
